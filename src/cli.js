@@ -51,6 +51,8 @@ export async function run(args) {
       return runShare();
     case 'whoami':
       return runWhoami();
+    case 'subscribe':
+      return runSubscribe();
     case 'help':
     case '--help':
     case '-h':
@@ -466,6 +468,71 @@ async function runPublish(args = []) {
   }
 }
 
+async function runSubscribe() {
+  console.log(banner());
+
+  const config = await getConfig();
+  const API_URL = config.apiUrl || 'http://localhost:3457';
+
+  if (!config.token) {
+    console.log(`  ${c.yellow}Login first:${c.reset} ${c.cyan}narrowscore login${c.reset}\n`);
+    return;
+  }
+
+  const spinner = startSpinner('Getting pricing...');
+
+  try {
+    // Show current price
+    const pricingRes = await fetch(`${API_URL}/api/pricing`);
+    const pricing = await pricingRes.json();
+    spinner.stop('');
+
+    console.log(`\n  ${c.bold}NarrowScore Pro${c.reset}`);
+    console.log(`  ${c.dim}Current price:${c.reset} ${c.bold}${c.cyan}${pricing.currentPrice}${c.reset}`);
+    console.log(`  ${c.yellow}${pricing.urgencyMessage}${c.reset}\n`);
+
+    const subSpinner = startSpinner('Creating checkout...');
+
+    const res = await fetch(`${API_URL}/api/subscribe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.token}`,
+      },
+    });
+    const result = await res.json();
+
+    if (result.alreadySubscribed) {
+      subSpinner.stop('Already subscribed!');
+      console.log(`  ${c.green}${c.bold}You're already a Pro subscriber!${c.reset}`);
+      console.log(`  ${c.dim}Locked price: $${(result.priceCents / 100).toFixed(0)}/mo forever${c.reset}\n`);
+      return;
+    }
+
+    if (result.free) {
+      subSpinner.stop('Subscribed!');
+      console.log(`  ${c.green}${c.bold}You're in! FREE FOREVER.${c.reset}`);
+      console.log(`  ${c.dim}You subscribed on launch day — your price is locked at $0.${c.reset}\n`);
+      return;
+    }
+
+    if (result.url) {
+      subSpinner.stop('Checkout ready');
+      console.log(`  ${c.bold}Complete payment:${c.reset} ${c.cyan}${result.url}${c.reset}\n`);
+      try {
+        const { execSync } = await import('child_process');
+        execSync(`open "${result.url}"`, { stdio: 'ignore' });
+      } catch { /* not macOS */ }
+      return;
+    }
+
+    subSpinner.fail(result.error || 'Something went wrong');
+  } catch (err) {
+    spinner.fail('Failed');
+    console.error(`  ${c.red}${err.message}${c.reset}\n`);
+  }
+}
+
 function getSpendTierName(usd) {
   if (usd >= 500) return 'WHALE';
   if (usd >= 200) return 'POWER SPENDER';
@@ -540,6 +607,7 @@ function showHelp() {
   console.log(`  ${c.bold}SOCIAL${c.reset}`);
   console.log(`    narrowscore login        Connect your GitHub account`);
   console.log(`    narrowscore publish      Publish score to leaderboard`);
+  console.log(`    narrowscore subscribe    Subscribe to NarrowScore Pro`);
   console.log(`    narrowscore share        Generate shareable text card`);
   console.log(`    narrowscore whoami       Show your account info`);
   console.log('');

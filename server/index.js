@@ -14,12 +14,26 @@ import { startDeviceFlow, pollDeviceFlow, exchangeCode, getGitHubUser, generateJ
 import { getCurrentPriceCents, formatPrice, getUrgencyMessage } from './pricing.js';
 import { checkAndAwardBadges, BADGES } from './badges.js';
 import * as social from './social.js';
+import { createCheckoutSession, handleWebhook, processWebhookEvent, getSubscriptionInfo, cancelSubscription } from './stripe.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3457;
 
 app.use(cors());
+
+// Stripe webhook needs raw body — must be before express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const event = await handleWebhook(req.body, req.headers['stripe-signature']);
+    const db = getDb();
+    processWebhookEvent(db, event);
+    res.json({ received: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.use(express.json());
 
 // Serve website static files
@@ -337,6 +351,40 @@ app.get('/api/pricing', (_req, res) => {
     currentPrice: formatPrice(getCurrentPriceCents()),
     urgencyMessage: getUrgencyMessage(),
   });
+});
+
+// ============================
+// STRIPE ROUTES
+// ============================
+
+// Create checkout session
+app.post('/api/subscribe', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await createCheckoutSession(db, req.user.userId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get subscription info
+app.get('/api/subscription', requireAuth, (req, res) => {
+  const db = getDb();
+  const info = getSubscriptionInfo(db, req.user.userId);
+  if (!info) return res.status(404).json({ error: 'User not found' });
+  res.json(info);
+});
+
+// Cancel subscription
+app.post('/api/subscription/cancel', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await cancelSubscription(db, req.user.userId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Health

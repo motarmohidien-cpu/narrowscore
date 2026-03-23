@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Subscribed — NarrowScore</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="top-nav">
+    <a href="/" class="logo">NARROWSCORE</a>
+    <nav>
+      <a href="/" data-page="home">Leaderboard</a>
+      <a href="/feed.html" data-page="feed">Feed</a>
+      <a href="#" class="auth-link" data-page="profile">Login</a>
+    </nav>
+  </header>
+
+  <section class="section" style="text-align:center;padding:4rem 1rem">
+    <div style="font-size:3rem;margin-bottom:1rem">&#127881;</div>
+    <h2 style="font-size:1.8rem;margin-bottom:0.5rem">You're In!</h2>
+    <p class="text-dim" style="margin-bottom:1.5rem">Your price is locked in forever. Welcome to NarrowScore Pro.</p>
+    <div id="locked-price" style="font-family:'JetBrains Mono',monospace;font-size:2rem;color:var(--cyan);margin-bottom:2rem"></div>
+    <a href="/" class="page-btn" style="text-decoration:none;display:inline-block;padding:0.75rem 2rem">Go to Leaderboard</a>
+  </section>
+
+  <nav class="bottom-nav">
+    <a href="/" data-page="home">
+      <span class="icon">&#127942;</span>Board
+    </a>
+    <a href="/feed.html" data-page="feed">
+      <span class="icon">&#128225;</span>Feed
+    </a>
+    <a href="#" class="auth-link" data-page="profile" style="position:relative">
+      <span class="icon">&#128100;</span>Profile
+    </a>
+  </nav>
+
+  <script src="/js/app.js"></script>
+  <script>
+    NS.renderNav('');
+    // Show locked price
+    NS.api('/api/subscription').then(info => {
+      const el = document.getElementById('locked-price');
+      if (info.priceLocked === 0) {
+        el.textContent = 'FREE FOREVER';
+      } else {
+        el.textContent = `$${(info.priceLocked / 100).toFixed(0)}/mo forever`;
+      }
+    }).catch(() => {});
+  </script>
+</body>
+</html>

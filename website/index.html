@@ -34,7 +34,13 @@
       <code>npx narrowscore</code>
     </div>
 
-    <div id="urgency-banner" class="urgency-banner hidden"></div>
+    <div id="urgency-banner" class="urgency-banner hidden" style="cursor:pointer" onclick="subscribe()"></div>
+
+    <div id="subscribe-cta" class="hidden" style="margin-top:0.75rem">
+      <button onclick="subscribe()" style="background:var(--cyan);color:var(--bg);border:none;border-radius:8px;padding:0.6rem 1.5rem;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.85rem;cursor:pointer;transition:transform 0.1s">
+        Lock in your price now
+      </button>
+    </div>
 
     <div class="live-counter">
       <div class="counter-item">
@@ -136,6 +142,7 @@
         const banner = document.getElementById('urgency-banner');
         banner.textContent = stats.pricing.urgencyMessage;
         banner.classList.remove('hidden');
+        document.getElementById('subscribe-cta').classList.remove('hidden');
       }
     }
 
@@ -214,6 +221,26 @@
       const h = document.querySelector('.copy-hint');
       h.textContent = 'copied!';
       setTimeout(() => h.textContent = 'copy', 2000);
+    }
+
+    async function subscribe() {
+      if (!NS.isLoggedIn) { NS.login(); return; }
+      const btn = document.querySelector('#subscribe-cta button');
+      btn.textContent = 'Processing...';
+      const result = await NS.api('/api/subscribe', { method: 'POST' });
+      if (result.alreadySubscribed) {
+        btn.textContent = 'Already subscribed!';
+        return;
+      }
+      if (result.free) {
+        window.location.href = '/subscribe/success';
+        return;
+      }
+      if (result.url) {
+        window.location.href = result.url;
+        return;
+      }
+      btn.textContent = result.error || 'Error — try again';
     }
 
     NS.renderNav('home');
