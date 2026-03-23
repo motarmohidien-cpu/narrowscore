@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NarrowScore Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a12;
+      --bg2: #0f0f1a;
+      --bg3: #151525;
+      --cyan: #00ccff;
+      --magenta: #ff44ff;
+      --green: #00ffaa;
+      --gold: #ffd700;
+      --red: #ff4444;
+      --orange: #ff8844;
+      --text: #e0e0f0;
+      --dim: #666688;
+      --border: #1a1a2e;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg2);
+    }
+
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--cyan);
+      text-decoration: none;
+      letter-spacing: 2px;
+    }
+
+    nav a {
+      color: var(--dim);
+      text-decoration: none;
+      margin-left: 2rem;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--cyan); }
+
+    /* Card container */
+    .card-container {
+      margin-top: 3rem;
+      max-width: 500px;
+      width: 100%;
+      padding: 0 1rem;
+    }
+
+    .profile-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card-accent {
+      height: 4px;
+      width: 100%;
+    }
+
+    .card-header {
+      text-align: center;
+      padding: 2rem 2rem 1rem;
+    }
+
+    .card-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-username {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .card-rank {
+      color: var(--dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Score section */
+    .card-score {
+      text-align: center;
+      padding: 1.5rem 2rem;
+    }
+
+    .score-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 4rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score-max {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.2rem;
+      color: var(--dim);
+    }
+
+    .score-bar-container {
+      width: 80%;
+      height: 10px;
+      background: var(--bg);
+      border-radius: 5px;
+      margin: 1rem auto 0;
+      overflow: hidden;
+    }
+
+    .score-bar-inner {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.8s ease;
+    }
+
+    .tier-label {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.4rem 1.5rem;
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    /* Stats grid */
+    .card-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat {
+      text-align: center;
+      padding: 1.25rem 0.5rem;
+      border-right: 1px solid var(--border);
+    }
+
+    .stat:last-child { border-right: none; }
+
+    .stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+    }
+
+    /* Tools */
+    .card-tools {
+      padding: 1.5rem 2rem;
+    }
+
+    .tools-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--dim);
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    .tool-tag {
+      display: inline-block;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.75rem;
+      margin: 0.2rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--cyan);
+    }
+
+    /* Footer */
+    .card-footer {
+      text-align: center;
+      padding: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .card-footer a {
+      color: var(--cyan);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .card-footer .sub {
+      color: var(--dim);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: var(--dim);
+    }
+
+    .error {
+      text-align: center;
+      padding: 4rem;
+      color: var(--red);
+    }
+
+    .tier-S { color: var(--gold); background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); }
+    .tier-A { color: var(--green); background: rgba(0,255,170,0.1); border: 1px solid rgba(0,255,170,0.3); }
+    .tier-B { color: var(--cyan); background: rgba(0,204,255,0.1); border: 1px solid rgba(0,204,255,0.3); }
+    .tier-C { color: #aaaacc; background: rgba(170,170,204,0.1); border: 1px solid rgba(170,170,204,0.2); }
+    .tier-D { color: var(--orange); background: rgba(255,136,68,0.1); border: 1px solid rgba(255,136,68,0.2); }
+    .tier-F { color: var(--red); background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.2); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="logo">NARROWSCORE</a>
+    <nav>
+      <a href="/#leaderboard">Leaderboard</a>
+    </nav>
+  </header>
+
+  <div class="card-container" id="card-container">
+    <div class="loading">Loading profile...</div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    const username = new URLSearchParams(window.location.search).get('u');
+
+    const tierColors = {
+      S: '#ffd700', A: '#00ffaa', B: '#00ccff',
+      C: '#aaaacc', D: '#ff8844', F: '#ff4444'
+    };
+
+    function formatTokens(n) {
+      if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+      if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+      return n.toString();
+    }
+
+    async function loadProfile() {
+      const container = document.getElementById('card-container');
+
+      if (!username) {
+        container.innerHTML = '<div class="error">No username specified</div>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API}/api/profile/${username}`);
+        if (!res.ok) {
+          container.innerHTML = '<div class="error">Profile not found</div>';
+          return;
+        }
+
+        const p = await res.json();
+        document.title = `${p.username} — NarrowScore`;
+
+        const tc = tierColors[p.tier] || '#aaaacc';
+        const initials = p.username.slice(0, 2).toUpperCase();
+
+        container.innerHTML = `
+          <div class="profile-card">
+            <div class="card-accent" style="background:linear-gradient(90deg, transparent, ${tc}, transparent)"></div>
+
+            <div class="card-header">
+              <div class="card-avatar" style="background:${p.avatar_color || '#4ECDC4'}; color:rgba(0,0,0,0.6)">
+                ${initials}
+              </div>
+              <div class="card-username">@${p.username}</div>
+              <div class="card-rank">#${p.rank} on the leaderboard</div>
+            </div>
+
+            <div class="card-score">
+              <span class="score-num" style="color:${tc}">${p.score}</span>
+              <span class="score-max">/100</span>
+              <div class="score-bar-container">
+                <div class="score-bar-inner" style="width:${p.score}%;background:linear-gradient(90deg,${tc}88,${tc})"></div>
+              </div>
+              <div class="tier-label tier-${p.tier}">${p.tier}-TIER ${p.label}</div>
+            </div>
+
+            <div class="card-stats">
+              <div class="stat">
+                <div class="stat-label">Spend</div>
+                <div class="stat-value" style="color:#ff44ff">$${p.spend_usd.toFixed(0)}</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Tokens</div>
+                <div class="stat-value" style="color:#00ccff">${formatTokens(p.tokens_total)}</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Days</div>
+                <div class="stat-value" style="color:#aaaacc">${p.days_active}</div>
+              </div>
+            </div>
+
+            <div class="card-stats" style="border-top:none">
+              <div class="stat">
+                <div class="stat-label">Sessions</div>
+                <div class="stat-value">${p.sessions}</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Projects</div>
+                <div class="stat-value">${p.projects}</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Narrows</div>
+                <div class="stat-value" style="color:#00ffaa">${p.narrows_cleared}/${p.narrows_total}</div>
+              </div>
+            </div>
+
+            <div class="card-tools">
+              <div class="tools-title">Top Tools</div>
+              ${(p.top_tools || []).map(t => `<span class="tool-tag">${t}</span>`).join('')}
+            </div>
+
+            <div class="card-footer">
+              <a href="/">npx narrowscore</a>
+              <div class="sub">narrowscore.com</div>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        container.innerHTML = '<div class="error">Failed to load profile</div>';
+        console.error(e);
+      }
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

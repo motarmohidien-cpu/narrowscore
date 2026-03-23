@@ -1,0 +1,6 @@
+node_modules/
+data/narrowscore.db
+data/narrowscore.db-wal
+data/narrowscore.db-shm
+*.png
+.DS_Store
