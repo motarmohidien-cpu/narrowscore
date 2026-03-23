@@ -2,444 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>NarrowScore — Find your narrow. Fix it. Repeat.</title>
-  <meta name="description" content="The AI efficiency score for Claude Code users. Based on Goldratt's Theory of Constraints. Find your #1 bottleneck. Fix it. Watch your score climb.">
+  <meta name="description" content="The AI efficiency score for Claude Code users. Based on Goldratt's Theory of Constraints.">
   <meta property="og:title" content="NarrowScore — The AI Efficiency Score">
-  <meta property="og:description" content="Find your narrow. Fix it. Repeat. Score 0-100 based on your Claude Code usage.">
-  <meta property="og:type" content="website">
+  <meta property="og:description" content="Find your narrow. Fix it. Repeat. Score 0-100.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0a0a12;
-      --bg2: #0f0f1a;
-      --bg3: #151525;
-      --cyan: #00ccff;
-      --magenta: #ff44ff;
-      --green: #00ffaa;
-      --gold: #ffd700;
-      --red: #ff4444;
-      --orange: #ff8844;
-      --text: #e0e0f0;
-      --dim: #666688;
-      --border: #1a1a2e;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', -apple-system, sans-serif;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    .mono { font-family: 'JetBrains Mono', monospace; }
-
-    /* Glow effects */
-    .glow-cyan { text-shadow: 0 0 20px rgba(0,204,255,0.3); }
-    .glow-magenta { text-shadow: 0 0 20px rgba(255,68,255,0.3); }
-
-    /* Header */
-    header {
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--bg2);
-    }
-
-    .logo {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 1.2rem;
-      color: var(--cyan);
-      text-decoration: none;
-      letter-spacing: 2px;
-    }
-
-    nav a {
-      color: var(--dim);
-      text-decoration: none;
-      margin-left: 2rem;
-      font-size: 0.9rem;
-      transition: color 0.2s;
-    }
-
-    nav a:hover { color: var(--cyan); }
-
-    /* Hero */
-    .hero {
-      text-align: center;
-      padding: 5rem 2rem 3rem;
-      background: radial-gradient(ellipse at center top, rgba(0,204,255,0.05) 0%, transparent 60%);
-      position: relative;
-    }
-
-    .hero::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 400px;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-    }
-
-    .hero h1 {
-      font-size: 3.5rem;
-      font-weight: 900;
-      margin-bottom: 1rem;
-      background: linear-gradient(135deg, var(--cyan), var(--magenta));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hero .tagline {
-      font-size: 1.3rem;
-      color: var(--dim);
-      margin-bottom: 2rem;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .cta-box {
-      display: inline-block;
-      background: var(--bg3);
-      border: 1px solid var(--cyan);
-      border-radius: 8px;
-      padding: 1rem 2rem;
-      margin: 1rem 0;
-      cursor: pointer;
-      transition: all 0.2s;
-      position: relative;
-    }
-
-    .cta-box:hover {
-      background: rgba(0,204,255,0.05);
-      box-shadow: 0 0 20px rgba(0,204,255,0.15);
-    }
-
-    .cta-box code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1.3rem;
-      color: var(--cyan);
-      font-weight: 700;
-    }
-
-    .cta-box .copy-hint {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      background: var(--cyan);
-      color: var(--bg);
-      font-size: 0.65rem;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 700;
-    }
-
-    /* Live counter */
-    .live-counter {
-      margin-top: 2rem;
-      display: flex;
-      justify-content: center;
-      gap: 3rem;
-    }
-
-    .counter-item {
-      text-align: center;
-    }
-
-    .counter-item .num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--magenta);
-    }
-
-    .counter-item .label {
-      font-size: 0.8rem;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-
-    /* Leaderboard section */
-    .section {
-      padding: 4rem 2rem;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    .section-title {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      letter-spacing: 4px;
-      color: var(--dim);
-      margin-bottom: 2rem;
-      text-transform: uppercase;
-    }
-
-    /* Sort tabs */
-    .sort-tabs {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .sort-tab {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--dim);
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      transition: all 0.2s;
-    }
-
-    .sort-tab:hover { border-color: var(--cyan); color: var(--text); }
-    .sort-tab.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,204,255,0.05); }
-
-    /* Leaderboard table */
-    .leaderboard {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .leaderboard th {
-      text-align: left;
-      padding: 0.75rem 1rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 2px;
-      color: var(--dim);
-      border-bottom: 1px solid var(--border);
-      text-transform: uppercase;
-    }
-
-    .leaderboard td {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-      font-size: 0.9rem;
-    }
-
-    .leaderboard tr:hover td {
-      background: rgba(0,204,255,0.02);
-    }
-
-    .leaderboard .rank {
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--dim);
-      width: 50px;
-    }
-
-    .leaderboard .rank.top3 { color: var(--gold); font-weight: 700; }
-
-    .user-cell {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: rgba(0,0,0,0.6);
-      flex-shrink: 0;
-    }
-
-    .username-link {
-      color: var(--text);
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .username-link:hover { color: var(--cyan); }
-
-    .score-cell {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-    }
-
-    .score-bar {
-      display: inline-block;
-      width: 60px;
-      height: 6px;
-      background: var(--border);
-      border-radius: 3px;
-      overflow: hidden;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
-
-    .score-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-    }
-
-    .tier-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 2px 10px;
-      border-radius: 12px;
-      display: inline-block;
-    }
-
-    .tier-S { color: var(--gold); background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.3); }
-    .tier-A { color: var(--green); background: rgba(0,255,170,0.1); border: 1px solid rgba(0,255,170,0.3); }
-    .tier-B { color: var(--cyan); background: rgba(0,204,255,0.1); border: 1px solid rgba(0,204,255,0.3); }
-    .tier-C { color: #aaaacc; background: rgba(170,170,204,0.1); border: 1px solid rgba(170,170,204,0.2); }
-    .tier-D { color: var(--orange); background: rgba(255,136,68,0.1); border: 1px solid rgba(255,136,68,0.2); }
-    .tier-F { color: var(--red); background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.2); }
-
-    .spend-cell {
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--magenta);
-    }
-
-    .spend-badge {
-      font-size: 0.65rem;
-      letter-spacing: 1px;
-      opacity: 0.7;
-    }
-
-    /* Pagination */
-    .pagination {
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-top: 2rem;
-    }
-
-    .page-btn {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--dim);
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      transition: all 0.2s;
-    }
-
-    .page-btn:hover { border-color: var(--cyan); color: var(--text); }
-    .page-btn.active { border-color: var(--cyan); color: var(--cyan); }
-    .page-btn:disabled { opacity: 0.3; cursor: default; }
-
-    /* How it works */
-    .how-it-works {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .step {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2rem;
-      text-align: center;
-      transition: border-color 0.2s;
-    }
-
-    .step:hover { border-color: var(--cyan); }
-
-    .step-num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--cyan);
-      margin-bottom: 0.5rem;
-    }
-
-    .step h3 {
-      font-size: 1.1rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .step p { color: var(--dim); font-size: 0.9rem; }
-
-    /* Footer */
-    footer {
-      text-align: center;
-      padding: 3rem 2rem;
-      border-top: 1px solid var(--border);
-      color: var(--dim);
-      font-size: 0.85rem;
-    }
-
-    footer a { color: var(--cyan); text-decoration: none; }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .hero h1 { font-size: 2rem; }
-      .live-counter { flex-direction: column; gap: 1rem; }
-      .how-it-works { grid-template-columns: 1fr; }
-      .leaderboard { font-size: 0.8rem; }
-      .leaderboard td, .leaderboard th { padding: 0.5rem; }
-      .score-bar { width: 40px; }
-      header { flex-direction: column; gap: 1rem; }
-    }
-  </style>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
-  <header>
+  <!-- Top nav (desktop) -->
+  <header class="top-nav">
     <a href="/" class="logo">NARROWSCORE</a>
     <nav>
-      <a href="#leaderboard">Leaderboard</a>
-      <a href="#how-it-works">How it works</a>
-      <a href="https://github.com/narrowscore/narrowscore">GitHub</a>
+      <a href="/" data-page="home" class="active">Leaderboard</a>
+      <a href="/feed.html" data-page="feed">Feed</a>
+      <a href="#" class="auth-link" data-page="profile">Login</a>
     </nav>
   </header>
 
+  <!-- Hero -->
   <section class="hero">
     <h1>Find your narrow.</h1>
     <p class="tagline">The AI efficiency score for Claude Code users.</p>
 
-    <div class="cta-box" onclick="copyCommand()">
-      <span class="copy-hint">click to copy</span>
+    <div class="cta-box" onclick="copyCmd()">
+      <span class="copy-hint">copy</span>
       <code>npx narrowscore</code>
     </div>
 
-    <p style="color: var(--dim); font-size: 0.85rem; margin-top: 1rem;">
-      Based on Goldratt's Theory of Constraints. Score 0-100.
-    </p>
+    <div id="urgency-banner" class="urgency-banner hidden"></div>
 
     <div class="live-counter">
       <div class="counter-item">
         <div class="num" id="total-users">—</div>
-        <div class="label">Users scored</div>
+        <div class="label">Users</div>
       </div>
       <div class="counter-item">
         <div class="num" id="avg-score">—</div>
-        <div class="label">Avg score</div>
+        <div class="label">Avg Score</div>
       </div>
       <div class="counter-item">
         <div class="num" id="total-spend">—</div>
-        <div class="label">Total spend</div>
+        <div class="label">Total Spend</div>
       </div>
     </div>
   </section>
 
+  <!-- Leaderboard -->
   <section class="section" id="leaderboard">
     <div class="section-title">Leaderboard</div>
 
@@ -447,173 +60,163 @@
       <button class="sort-tab active" data-sort="score">Score</button>
       <button class="sort-tab" data-sort="spend">Spend</button>
       <button class="sort-tab" data-sort="tokens">Tokens</button>
-      <button class="sort-tab" data-sort="recent">Recent</button>
+      <button class="sort-tab" data-sort="recent">New</button>
     </div>
 
-    <table class="leaderboard">
+    <!-- Mobile: cards -->
+    <div class="lb-cards" id="lb-cards">
+      <div class="loading"><span class="spinner"></span>Loading...</div>
+    </div>
+
+    <!-- Desktop: table -->
+    <table class="lb-table">
       <thead>
-        <tr>
-          <th>#</th>
-          <th>User</th>
-          <th>Score</th>
-          <th>Tier</th>
-          <th>Spend</th>
-        </tr>
+        <tr><th>#</th><th>User</th><th>Score</th><th>Tier</th><th>Spend</th></tr>
       </thead>
-      <tbody id="leaderboard-body">
-        <tr><td colspan="5" style="text-align:center;color:var(--dim);padding:2rem;">Loading...</td></tr>
+      <tbody id="lb-tbody">
+        <tr><td colspan="5" class="loading"><span class="spinner"></span>Loading...</td></tr>
       </tbody>
     </table>
 
     <div class="pagination" id="pagination"></div>
   </section>
 
+  <!-- How it works -->
   <section class="section" id="how-it-works">
     <div class="section-title">How it works</div>
     <div class="how-it-works">
       <div class="step">
         <div class="step-num">1</div>
         <h3>Identify</h3>
-        <p>Scan your Claude Code sessions. Find your #1 bottleneck — the narrow point limiting your throughput.</p>
+        <p>Scan your Claude Code sessions. Find the #1 bottleneck limiting your throughput.</p>
       </div>
       <div class="step">
         <div class="step-num">2</div>
         <h3>Fix</h3>
-        <p>Get actionable fixes with dollar savings. Auto-generate CLAUDE.md, optimize workflows, reduce token waste.</p>
+        <p>Get actionable fixes with dollar savings. See the ROI before you invest.</p>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <h3>Repeat</h3>
-        <p>Fix one narrow, find the next. Watch your score climb. Share your player card. Flex on the leaderboard.</p>
+        <p>Fix one narrow, find the next. Share your player card. Climb the leaderboard.</p>
       </div>
     </div>
   </section>
 
   <footer>
     <p>NarrowScore — Based on <em>The Goal</em> by Eliyahu Goldratt</p>
-    <p style="margin-top: 0.5rem;">
-      <a href="https://github.com/narrowscore/narrowscore">GitHub</a> ·
-      Built for Claude Code super users
-    </p>
+    <p class="mt-1"><a href="https://github.com/motarmohidien-cpu/narrowscore">GitHub</a> · Built for Claude Code super users</p>
   </footer>
 
+  <!-- Bottom nav (mobile) -->
+  <nav class="bottom-nav">
+    <a href="/" data-page="home" class="active">
+      <span class="icon">🏆</span>Board
+    </a>
+    <a href="/feed.html" data-page="feed">
+      <span class="icon">📡</span>Feed
+    </a>
+    <a href="#" class="auth-link" data-page="profile" style="position:relative">
+      <span class="icon">👤</span>Profile
+    </a>
+  </nav>
+
+  <script src="/js/app.js"></script>
   <script>
-    const API = window.location.origin;
     let currentSort = 'score';
     let currentPage = 1;
 
-    // Tier color map
-    const tierColors = {
-      S: '#ffd700', A: '#00ffaa', B: '#00ccff',
-      C: '#aaaacc', D: '#ff8844', F: '#ff4444'
-    };
-
-    function scoreColor(score) {
-      if (score >= 90) return '#ffd700';
-      if (score >= 75) return '#00ffaa';
-      if (score >= 60) return '#00ccff';
-      if (score >= 40) return '#aaaacc';
-      if (score >= 20) return '#ff8844';
-      return '#ff4444';
-    }
-
-    function formatMoney(n) {
-      if (n >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
-      if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'K';
-      return '$' + n.toFixed(0);
-    }
-
-    function formatTokens(n) {
-      if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
-      if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-      if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
-      return n.toString();
-    }
-
-    // Load stats
     async function loadStats() {
-      try {
-        const res = await fetch(`${API}/api/stats`);
-        const stats = await res.json();
-        document.getElementById('total-users').textContent = stats.totalUsers.toLocaleString();
-        document.getElementById('avg-score').textContent = stats.avgScore + '/100';
-        document.getElementById('total-spend').textContent = formatMoney(stats.totalSpend);
-      } catch (e) {
-        console.error('Failed to load stats:', e);
+      const stats = await NS.api('/api/stats');
+      document.getElementById('total-users').textContent = stats.totalUsers?.toLocaleString() || '—';
+      document.getElementById('avg-score').textContent = stats.avgScore ? stats.avgScore + '/100' : '—';
+      document.getElementById('total-spend').textContent = stats.totalSpend ? NS.formatMoney(stats.totalSpend) : '—';
+
+      if (stats.pricing?.urgencyMessage) {
+        const banner = document.getElementById('urgency-banner');
+        banner.textContent = stats.pricing.urgencyMessage;
+        banner.classList.remove('hidden');
       }
     }
 
-    // Load leaderboard
     async function loadLeaderboard(sort = 'score', page = 1) {
       currentSort = sort;
       currentPage = page;
 
-      // Update active tab
-      document.querySelectorAll('.sort-tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.sort === sort);
-      });
+      document.querySelectorAll('.sort-tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.sort === sort)
+      );
 
-      const tbody = document.getElementById('leaderboard-body');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--dim);padding:2rem;">Loading...</td></tr>';
+      const data = await NS.api(`/api/leaderboard?sort=${sort}&page=${page}&limit=25`);
 
-      try {
-        const res = await fetch(`${API}/api/leaderboard?sort=${sort}&page=${page}&limit=25`);
-        const data = await res.json();
+      // Mobile cards
+      const cards = document.getElementById('lb-cards');
+      cards.innerHTML = data.profiles.map((p, i) => {
+        const rank = (page - 1) * 25 + i + 1;
+        const sc = NS.scoreColor(p.score);
+        const initials = p.username.slice(0, 2).toUpperCase();
+        return `<a href="/profile.html?u=${p.username}" class="lb-card">
+          <div class="lb-rank ${rank <= 3 ? 'top3' : ''}">${rank}</div>
+          <div class="lb-avatar" style="background:${p.avatar_color}">${initials}</div>
+          <div class="lb-info">
+            <div class="lb-username">${p.username}</div>
+            <div class="lb-meta">
+              <span>$${Math.round(p.spend_usd)}</span>
+              <span>${NS.formatTokens(p.tokens_total)} tok</span>
+            </div>
+          </div>
+          <div class="lb-right">
+            <div class="lb-score" style="color:${sc}">${p.score}</div>
+            <span class="tier-badge tier-${p.tier}">${p.tier}</span>
+          </div>
+        </a>`;
+      }).join('');
 
-        tbody.innerHTML = data.profiles.map((p, i) => {
-          const rank = (page - 1) * 25 + i + 1;
-          const initials = p.username.slice(0, 2).toUpperCase();
-          const sc = scoreColor(p.score);
-          const tc = tierColors[p.tier] || '#aaaacc';
-          const pct = p.score;
+      // Desktop table
+      const tbody = document.getElementById('lb-tbody');
+      tbody.innerHTML = data.profiles.map((p, i) => {
+        const rank = (page - 1) * 25 + i + 1;
+        const sc = NS.scoreColor(p.score);
+        const initials = p.username.slice(0, 2).toUpperCase();
+        return `<tr>
+          <td class="mono ${rank <= 3 ? 'text-gold text-bold' : 'text-dim'}">${rank}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:0.6rem">
+              <div class="lb-avatar" style="background:${p.avatar_color};width:28px;height:28px;font-size:0.6rem">${initials}</div>
+              <a href="/profile.html?u=${p.username}" style="font-weight:600">${p.username}</a>
+            </div>
+          </td>
+          <td class="mono text-bold" style="color:${sc}">
+            <span class="score-bar"><span class="score-bar-fill" style="width:${p.score}%;background:${sc}"></span></span>
+            ${p.score}
+          </td>
+          <td><span class="tier-badge tier-${p.tier}">${p.tier}</span></td>
+          <td class="mono text-magenta">$${Math.round(p.spend_usd)}</td>
+        </tr>`;
+      }).join('');
 
-          return `<tr>
-            <td class="rank ${rank <= 3 ? 'top3' : ''}">${rank}</td>
-            <td>
-              <div class="user-cell">
-                <div class="avatar" style="background:${p.avatar_color}">${initials}</div>
-                <a href="/profile.html?u=${p.username}" class="username-link">${p.username}</a>
-              </div>
-            </td>
-            <td class="score-cell">
-              <span class="score-bar"><span class="score-bar-fill" style="width:${pct}%;background:${sc}"></span></span>
-              <span style="color:${sc}">${p.score}</span>
-            </td>
-            <td><span class="tier-badge tier-${p.tier}">${p.tier}</span></td>
-            <td class="spend-cell">$${p.spend_usd.toFixed(0)}</td>
-          </tr>`;
-        }).join('');
-
-        // Pagination
-        const pagDiv = document.getElementById('pagination');
-        let pagHTML = '';
-        pagHTML += `<button class="page-btn" onclick="loadLeaderboard('${sort}', ${page - 1})" ${page <= 1 ? 'disabled' : ''}>&lt;</button>`;
-        for (let p = Math.max(1, page - 2); p <= Math.min(data.pages, page + 2); p++) {
-          pagHTML += `<button class="page-btn ${p === page ? 'active' : ''}" onclick="loadLeaderboard('${sort}', ${p})">${p}</button>`;
-        }
-        pagHTML += `<button class="page-btn" onclick="loadLeaderboard('${sort}', ${page + 1})" ${page >= data.pages ? 'disabled' : ''}>&gt;</button>`;
-        pagDiv.innerHTML = pagHTML;
-
-      } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--red);padding:2rem;">Failed to load leaderboard</td></tr>';
-        console.error('Failed to load leaderboard:', e);
+      // Pagination
+      const pagDiv = document.getElementById('pagination');
+      let html = `<button class="page-btn" onclick="loadLeaderboard('${sort}',${page-1})" ${page<=1?'disabled':''}>&lt;</button>`;
+      for (let p = Math.max(1, page-2); p <= Math.min(data.pages, page+2); p++) {
+        html += `<button class="page-btn ${p===page?'active':''}" onclick="loadLeaderboard('${sort}',${p})">${p}</button>`;
       }
+      html += `<button class="page-btn" onclick="loadLeaderboard('${sort}',${page+1})" ${page>=data.pages?'disabled':''}>&gt;</button>`;
+      pagDiv.innerHTML = html;
     }
 
-    // Sort tab clicks
-    document.querySelectorAll('.sort-tab').forEach(tab => {
-      tab.addEventListener('click', () => loadLeaderboard(tab.dataset.sort, 1));
-    });
+    document.querySelectorAll('.sort-tab').forEach(tab =>
+      tab.addEventListener('click', () => loadLeaderboard(tab.dataset.sort, 1))
+    );
 
-    // Copy command
-    function copyCommand() {
+    function copyCmd() {
       navigator.clipboard.writeText('npx narrowscore');
-      const hint = document.querySelector('.copy-hint');
-      hint.textContent = 'copied!';
-      setTimeout(() => { hint.textContent = 'click to copy'; }, 2000);
+      const h = document.querySelector('.copy-hint');
+      h.textContent = 'copied!';
+      setTimeout(() => h.textContent = 'copy', 2000);
     }
 
-    // Init
+    NS.renderNav('home');
     loadStats();
     loadLeaderboard();
   </script>

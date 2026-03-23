@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Feed — NarrowScore</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="top-nav">
+    <a href="/" class="logo">NARROWSCORE</a>
+    <nav>
+      <a href="/" data-page="home">Leaderboard</a>
+      <a href="/feed.html" data-page="feed" class="active">Feed</a>
+      <a href="#" class="auth-link" data-page="profile">Login</a>
+    </nav>
+  </header>
+
+  <section class="section">
+    <div class="section-title">Activity Feed</div>
+
+    <div class="sort-tabs" style="margin-bottom:1.5rem">
+      <button class="sort-tab active" data-feed="global">Global</button>
+      <button class="sort-tab" data-feed="following">Following</button>
+    </div>
+
+    <div id="feed-container">
+      <div class="loading"><span class="spinner"></span>Loading feed...</div>
+    </div>
+
+    <div id="feed-more" class="text-center mt-2 hidden">
+      <button class="page-btn" onclick="loadMore()">Load more</button>
+    </div>
+  </section>
+
+  <nav class="bottom-nav">
+    <a href="/" data-page="home">
+      <span class="icon">🏆</span>Board
+    </a>
+    <a href="/feed.html" data-page="feed" class="active">
+      <span class="icon">📡</span>Feed
+    </a>
+    <a href="#" class="auth-link" data-page="profile" style="position:relative">
+      <span class="icon">👤</span>Profile
+    </a>
+  </nav>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let feedType = 'global';
+    let page = 1;
+
+    const EVENT_TEMPLATES = {
+      score_change: (e) => {
+        const d = e.data;
+        const dir = d.change > 0 ? '📈' : '📉';
+        return `${dir} Score changed <strong>${d.oldScore} → ${d.newScore}</strong> (${d.change > 0 ? '+' : ''}${d.change})`;
+      },
+      tier_up: (e) => {
+        const d = e.data;
+        return `🎉 Tier up! <strong>${d.oldTier} → ${d.newTier}</strong>`;
+      },
+      badge_earned: (e) => {
+        const d = e.data;
+        return `🏅 Earned badge: <strong>${d.badge?.name || d.badge_id}</strong>`;
+      },
+      milestone: (e) => e.data.message || 'Hit a milestone!',
+    };
+
+    function renderEvent(e) {
+      const template = EVENT_TEMPLATES[e.event_type] || (() => e.event_type);
+      const body = template(e);
+      const emojis = ['🔥', '🚀', '💯', '👏', '🤯'];
+      const emojiMap = { fire: '🔥', rocket: '🚀', '100': '💯', clap: '👏', mind_blown: '🤯' };
+
+      return `<div class="feed-card">
+        <div class="feed-header">
+          <div class="feed-avatar" style="background:${NS.tierColor('B')}"></div>
+          <a href="/profile.html?u=${e.username}" class="feed-username">${e.username}</a>
+          <span class="feed-time">${NS.timeAgo(e.created_at)}</span>
+        </div>
+        <div class="feed-body">${body}</div>
+        <div class="feed-actions">
+          ${emojis.map((emoji, i) => {
+            const names = ['fire', 'rocket', '100', 'clap', 'mind_blown'];
+            const isActive = e.my_reaction === names[i];
+            return `<button class="feed-action ${isActive ? 'active' : ''}" onclick="react(${e.id},'${names[i]}')">${emoji} ${e.reaction_count > 0 && i === 0 ? e.reaction_count : ''}</button>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    async function loadFeed(type = 'global', pg = 1) {
+      feedType = type;
+      page = pg;
+
+      document.querySelectorAll('[data-feed]').forEach(t =>
+        t.classList.toggle('active', t.dataset.feed === type)
+      );
+
+      const container = document.getElementById('feed-container');
+      if (pg === 1) container.innerHTML = '<div class="loading"><span class="spinner"></span>Loading...</div>';
+
+      const endpoint = type === 'following' ? '/api/feed' : '/api/feed/global';
+      const data = await NS.api(`${endpoint}?page=${pg}`);
+
+      if (pg === 1) container.innerHTML = '';
+
+      if (data.events?.length === 0 && pg === 1) {
+        container.innerHTML = `<div class="text-center text-dim" style="padding:3rem">
+          ${type === 'following' ? 'Follow some users to see their activity here.' : 'No activity yet. Be the first!'}
+        </div>`;
+        return;
+      }
+
+      const html = (data.events || []).map(renderEvent).join('');
+      if (pg === 1) container.innerHTML = html;
+      else container.insertAdjacentHTML('beforeend', html);
+
+      document.getElementById('feed-more').classList.toggle('hidden', (data.events || []).length < 30);
+    }
+
+    async function react(eventId, emoji) {
+      if (!NS.isLoggedIn) { NS.login(); return; }
+      await NS.api(`/api/events/${eventId}/react`, {
+        method: 'POST',
+        body: JSON.stringify({ emoji }),
+      });
+      loadFeed(feedType, 1); // Refresh
+    }
+
+    function loadMore() {
+      loadFeed(feedType, page + 1);
+    }
+
+    document.querySelectorAll('[data-feed]').forEach(tab =>
+      tab.addEventListener('click', () => {
+        if (tab.dataset.feed === 'following' && !NS.isLoggedIn) {
+          NS.login();
+          return;
+        }
+        loadFeed(tab.dataset.feed, 1);
+      })
+    );
+
+    NS.renderNav('feed');
+    loadFeed();
+  </script>
+</body>
+</html>
