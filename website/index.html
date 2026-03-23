@@ -3,23 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>NarrowScore — Find your narrow. Fix it. Repeat.</title>
-  <meta name="description" content="The AI efficiency score for Claude Code users. Based on Goldratt's Theory of Constraints.">
+  <title>NarrowScore — Find your narrow. Fix it. Save money.</title>
+  <meta name="description" content="Find the #1 bottleneck in your Claude Code setup. See exactly how much it costs you. Fix it. Repeat.">
   <meta property="og:title" content="NarrowScore — The AI Efficiency Score">
-  <meta property="og:description" content="Find your narrow. Fix it. Repeat. Score 0-100.">
+  <meta property="og:description" content="Find your narrow. Fix it. Save money. Score 0-99.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .value-section {
+      padding: 2rem 1rem;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .value-section h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+    .value-section p {
+      color: var(--dim);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 0.75rem;
+    }
+    .value-section code {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.15rem 0.4rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--cyan);
+    }
+    .terminal-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      line-height: 1.8;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .terminal-block .dim { color: var(--dim); }
+    .terminal-block .cyan { color: var(--cyan); }
+    .terminal-block .green { color: var(--green, #00ffaa); }
+    .terminal-block .red { color: #ff4444; }
+    .terminal-block .yellow { color: var(--gold); }
+    .terminal-block .magenta { color: var(--magenta, #ff66ff); }
+    .terminal-block .bold { font-weight: 700; }
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+    .faq-item {
+      margin-bottom: 1.5rem;
+    }
+    .faq-item h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
+    .faq-item p {
+      margin-bottom: 0.3rem;
+    }
+    .pricing-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      margin: 1rem 0;
+    }
+    .pricing-box .price {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .pricing-box .subtext {
+      font-size: 0.8rem;
+      color: var(--dim);
+      margin-top: 0.25rem;
+    }
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0;
+    }
+    .feature-list li {
+      padding: 0.4rem 0;
+      font-size: 0.85rem;
+      color: var(--text);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .feature-list .check { color: var(--cyan); font-weight: 700; flex-shrink: 0; }
+    .feature-list .lock { color: var(--dim); flex-shrink: 0; }
+  </style>
 </head>
 <body>
 
-  <!-- Top nav (desktop) -->
   <header class="top-nav">
     <a href="/" class="logo">NARROWSCORE</a>
     <nav>
-      <a href="/" data-page="home" class="active">Leaderboard</a>
-      <a href="/feed.html" data-page="feed">Feed</a>
+      <a href="/" data-page="home" class="active">Home</a>
+      <a href="#leaderboard">Leaderboard</a>
       <a href="#" class="auth-link" data-page="profile">Login</a>
     </nav>
   </header>
@@ -27,25 +121,21 @@
   <!-- Hero -->
   <section class="hero">
     <h1>Find your narrow.</h1>
-    <p class="tagline">The AI efficiency score for Claude Code users.</p>
+    <p class="tagline">See exactly how much your Claude Code bottlenecks cost you. Fix them. Save money.</p>
 
     <div class="cta-box" onclick="copyCmd()">
       <span class="copy-hint">copy</span>
       <code>npx narrowscore</code>
     </div>
 
-    <div id="urgency-banner" class="urgency-banner hidden" style="cursor:pointer" onclick="subscribe()"></div>
+    <p style="color:var(--dim);font-size:0.75rem;margin-top:0.5rem">Works instantly. Reads your local Claude sessions. Nothing leaves your machine.</p>
 
-    <div id="subscribe-cta" class="hidden" style="margin-top:0.75rem">
-      <button onclick="subscribe()" style="background:var(--cyan);color:var(--bg);border:none;border-radius:8px;padding:0.6rem 1.5rem;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.85rem;cursor:pointer;transition:transform 0.1s">
-        Lock in your price now
-      </button>
-    </div>
+    <div id="urgency-banner" class="urgency-banner hidden" style="cursor:pointer" onclick="subscribe()"></div>
 
     <div class="live-counter">
       <div class="counter-item">
         <div class="num" id="total-users">—</div>
-        <div class="label">Users</div>
+        <div class="label">Users Scored</div>
       </div>
       <div class="counter-item">
         <div class="num" id="avg-score">—</div>
@@ -53,10 +143,137 @@
       </div>
       <div class="counter-item">
         <div class="num" id="total-spend">—</div>
-        <div class="label">Total Spend</div>
+        <div class="label">Claude Spend Tracked</div>
       </div>
     </div>
   </section>
+
+  <!-- What you get -->
+  <section class="value-section">
+    <h2>What it does</h2>
+    <p>NarrowScore scans your Claude Code sessions and scores you <strong>0–99</strong> based on 8 constraints that waste your tokens and time.</p>
+    <p>It finds the <strong>#1 bottleneck</strong> — the one thing limiting your throughput — and tells you exactly how much it costs in dollars per month.</p>
+
+    <div class="terminal-block">
+      <span class="bold">NARROW SCORE</span> <span class="yellow">████████████████</span><span class="dim">░░░░░░░░</span> <span class="bold">66/99</span> <span class="dim">[B]</span><br>
+      <span class="dim">Solid Setup</span><br><br>
+      <span class="bold">SPEND</span><br>
+      <span class="magenta bold">$693.23</span> <span class="dim">total | </span><span class="bold">1085.6M</span> <span class="dim">tokens</span><br><br>
+      <span class="red bold">#1 NARROW</span> <span class="bold">No CLAUDE.md</span> <span class="dim">(-15 points)</span><br>
+      <span class="dim">2 active projects have no context files.</span><br>
+      <span class="yellow">Claude re-learns your stack every session.</span><br>
+      <span class="green bold">Fix this → save $6.34/month</span> <span class="dim">(tokens)</span><br>
+      <span class="cyan bold">Score: 66 → 81</span> <span class="dim">(+15 points)</span><br><br>
+      <span class="bold">FIX ALL 4 CONSTRAINTS</span><br>
+      <span class="green">$26.24/month</span> <span class="dim">saved | Score:</span> <span class="bold">66 → 99</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- How it works -->
+  <section class="value-section">
+    <h2>How it works</h2>
+
+    <div class="how-it-works">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Run one command</h3>
+        <p><code>npx narrowscore</code> scans your local Claude Code sessions. Finds all 8 constraint types. Calculates your score.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>See the money</h3>
+        <p>Every constraint shows a dollar cost — how much you waste per month. Your #1 narrow is the biggest bottleneck to fix first.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Fix it</h3>
+        <p><code>narrowscore fix</code> auto-generates the fix for your top constraint. Run it. Score goes up. Waste goes down. Find the next narrow. Repeat.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- What it checks -->
+  <section class="value-section">
+    <h2>8 constraints it checks</h2>
+    <p>Based on the Theory of Constraints — every system has one bottleneck limiting throughput. Fix that first.</p>
+
+    <div class="terminal-block" style="line-height:2">
+      <span class="bold">CONTEXT</span> <span class="dim">(52 points)</span><br>
+      <span class="cyan">1.</span> No CLAUDE.md <span class="dim">— Claude re-learns your stack every session</span><br>
+      <span class="cyan">2.</span> Thin CLAUDE.md <span class="dim">— context file exists but barely helps</span><br>
+      <span class="cyan">3.</span> No memory system <span class="dim">— decisions lost between conversations</span><br><br>
+      <span class="bold">EFFICIENCY</span> <span class="dim">(15 points)</span><br>
+      <span class="cyan">4.</span> Repeated context <span class="dim">— typing the same instructions over and over</span><br><br>
+      <span class="bold">WORKFLOW</span> <span class="dim">(15 points)</span><br>
+      <span class="cyan">5.</span> No subagent usage <span class="dim">— tasks run serially, not in parallel</span><br>
+      <span class="cyan">6.</span> Abandoned sessions <span class="dim">— frequent restarts waste init tokens</span><br><br>
+      <span class="bold">AUTOMATION</span> <span class="dim">(10 points)</span><br>
+      <span class="cyan">7.</span> No hooks/skills <span class="dim">— repetitive workflows typed manually</span><br><br>
+      <span class="bold">INTEGRATION</span> <span class="dim">(8 points)</span><br>
+      <span class="cyan">8.</span> No MCP servers <span class="dim">— manual copy-pasting from external tools</span>
+    </div>
+
+    <p>Score = 99 minus your active constraint penalties. Clear all constraints and you hit <strong>99</strong> — because there's always at least one bottleneck to find next.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- How it accesses your data / Security -->
+  <section class="value-section">
+    <h2>How it accesses your Claude usage</h2>
+
+    <div class="faq-item">
+      <h3>Where does it read data from?</h3>
+      <p>Claude Code stores session logs locally at <code>~/.claude/projects/</code>. Each session is a JSONL file with your conversation turns, tool usage, and token counts.</p>
+      <p>NarrowScore reads these files directly on your machine. It also checks <code>~/.claude/CLAUDE.md</code>, memory files, and your settings for hooks/MCP config.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Does my data leave my machine?</h3>
+      <p><strong>No.</strong> The scan runs 100% locally. Your sessions, code, and conversations are never sent anywhere. The only thing that leaves your machine is your score — if you choose to publish it to the leaderboard.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>How does it calculate spend?</h3>
+      <p>It reads the actual <code>message.usage</code> fields from your session files — real input tokens, output tokens, cache tokens — and applies Claude's published pricing per model (Sonnet, Opus, Haiku). If your sessions don't have token data, it falls back to estimates based on turn count.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>What gets published to the leaderboard?</h3>
+      <p>Only if you run <code>narrowscore publish</code>: your username, score, tier, total spend, token count, and top tools. No session content, no code, no conversations.</p>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Pricing -->
+  <section class="value-section">
+    <h2>Pricing</h2>
+
+    <ul class="feature-list">
+      <li><span class="check">&#10003;</span> Scan and score — see all 8 constraints and dollar waste</li>
+      <li><span class="check">&#10003;</span> Before/after tracking on every scan</li>
+      <li><span class="check">&#10003;</span> Player card generation (PNG)</li>
+      <li><span class="check">&#10003;</span> Publish to leaderboard</li>
+      <li><span class="lock">PRO</span> Auto-fix constraints (<code>narrowscore fix</code>)</li>
+      <li><span class="lock">PRO</span> Score trends and savings dashboard (<code>narrowscore monitor</code>)</li>
+      <li><span class="lock">PRO</span> Full scan history</li>
+    </ul>
+
+    <div class="pricing-box">
+      <div class="price" id="price-display">Loading...</div>
+      <div class="subtext" id="price-subtext">Price increases every day. Lock yours in forever.</div>
+      <button onclick="subscribe()" style="margin-top:1rem;background:var(--cyan);color:var(--bg);border:none;border-radius:8px;padding:0.6rem 1.5rem;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.85rem;cursor:pointer">
+        Lock in your price
+      </button>
+    </div>
+  </section>
+
+  <hr class="divider">
 
   <!-- Leaderboard -->
   <section class="section" id="leaderboard">
@@ -69,12 +286,10 @@
       <button class="sort-tab" data-sort="recent">New</button>
     </div>
 
-    <!-- Mobile: cards -->
     <div class="lb-cards" id="lb-cards">
       <div class="loading"><span class="spinner"></span>Loading...</div>
     </div>
 
-    <!-- Desktop: table -->
     <table class="lb-table">
       <thead>
         <tr><th>#</th><th>User</th><th>Score</th><th>Tier</th><th>Spend</th></tr>
@@ -87,43 +302,20 @@
     <div class="pagination" id="pagination"></div>
   </section>
 
-  <!-- How it works -->
-  <section class="section" id="how-it-works">
-    <div class="section-title">How it works</div>
-    <div class="how-it-works">
-      <div class="step">
-        <div class="step-num">1</div>
-        <h3>Identify</h3>
-        <p>Scan your Claude Code sessions. Find the #1 bottleneck limiting your throughput.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <h3>Fix</h3>
-        <p>Get actionable fixes with dollar savings. See the ROI before you invest.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <h3>Repeat</h3>
-        <p>Fix one narrow, find the next. Share your player card. Climb the leaderboard.</p>
-      </div>
-    </div>
-  </section>
-
   <footer>
-    <p>NarrowScore — Based on <em>The Goal</em> by Eliyahu Goldratt</p>
-    <p class="mt-1"><a href="https://github.com/motarmohidien-cpu/narrowscore">GitHub</a> · Built for Claude Code super users</p>
+    <p>NarrowScore — Find your narrow. Fix it. Save money.</p>
+    <p class="mt-1"><a href="https://github.com/motarmohidien-cpu/narrowscore">GitHub</a></p>
   </footer>
 
-  <!-- Bottom nav (mobile) -->
   <nav class="bottom-nav">
     <a href="/" data-page="home" class="active">
-      <span class="icon">🏆</span>Board
+      <span class="icon">&#127942;</span>Home
     </a>
     <a href="/feed.html" data-page="feed">
-      <span class="icon">📡</span>Feed
+      <span class="icon">&#128225;</span>Feed
     </a>
     <a href="#" class="auth-link" data-page="profile" style="position:relative">
-      <span class="icon">👤</span>Profile
+      <span class="icon">&#128100;</span>Profile
     </a>
   </nav>
 
@@ -135,14 +327,18 @@
     async function loadStats() {
       const stats = await NS.api('/api/stats');
       document.getElementById('total-users').textContent = stats.totalUsers?.toLocaleString() || '—';
-      document.getElementById('avg-score').textContent = stats.avgScore ? stats.avgScore + '/100' : '—';
+      document.getElementById('avg-score').textContent = stats.avgScore ? stats.avgScore + '/99' : '—';
       document.getElementById('total-spend').textContent = stats.totalSpend ? NS.formatMoney(stats.totalSpend) : '—';
 
-      if (stats.pricing?.urgencyMessage) {
+      if (stats.pricing) {
         const banner = document.getElementById('urgency-banner');
         banner.textContent = stats.pricing.urgencyMessage;
         banner.classList.remove('hidden');
-        document.getElementById('subscribe-cta').classList.remove('hidden');
+
+        const priceEl = document.getElementById('price-display');
+        const subEl = document.getElementById('price-subtext');
+        priceEl.textContent = stats.pricing.currentPrice;
+        subEl.textContent = stats.pricing.urgencyMessage;
       }
     }
 
@@ -156,7 +352,6 @@
 
       const data = await NS.api(`/api/leaderboard?sort=${sort}&page=${page}&limit=25`);
 
-      // Mobile cards
       const cards = document.getElementById('lb-cards');
       cards.innerHTML = data.profiles.map((p, i) => {
         const rank = (page - 1) * 25 + i + 1;
@@ -179,7 +374,6 @@
         </a>`;
       }).join('');
 
-      // Desktop table
       const tbody = document.getElementById('lb-tbody');
       tbody.innerHTML = data.profiles.map((p, i) => {
         const rank = (page - 1) * 25 + i + 1;
@@ -202,7 +396,6 @@
         </tr>`;
       }).join('');
 
-      // Pagination
       const pagDiv = document.getElementById('pagination');
       let html = `<button class="page-btn" onclick="loadLeaderboard('${sort}',${page-1})" ${page<=1?'disabled':''}>&lt;</button>`;
       for (let p = Math.max(1, page-2); p <= Math.min(data.pages, page+2); p++) {
@@ -225,22 +418,10 @@
 
     async function subscribe() {
       if (!NS.isLoggedIn) { NS.login(); return; }
-      const btn = document.querySelector('#subscribe-cta button');
-      btn.textContent = 'Processing...';
       const result = await NS.api('/api/subscribe', { method: 'POST' });
-      if (result.alreadySubscribed) {
-        btn.textContent = 'Already subscribed!';
-        return;
-      }
-      if (result.free) {
-        window.location.href = '/subscribe/success';
-        return;
-      }
-      if (result.url) {
-        window.location.href = result.url;
-        return;
-      }
-      btn.textContent = result.error || 'Error — try again';
+      if (result.free) { window.location.href = '/subscribe/'; return; }
+      if (result.url) { window.location.href = result.url; return; }
+      if (result.alreadySubscribed) { alert('Already subscribed!'); return; }
     }
 
     NS.renderNav('home');

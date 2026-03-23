@@ -199,7 +199,7 @@ export function getLeaderboard({ sort = 'score', page = 1, limit = 50 } = {}) {
   const database = getDb();
 
   const validSorts = {
-    score: 'score DESC',
+    score: 'score DESC, spend_usd DESC',
     spend: 'spend_usd DESC',
     tokens: 'tokens_total DESC',
     recent: 'join_date DESC',

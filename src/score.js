@@ -19,8 +19,10 @@ export function calculateScore(data) {
   const activeConstraints = detectConstraints(data);
 
   // Score = 100 minus the sum of all active constraint penalties
+  // Capped at 99 — there's always at least one constraint (Goldratt)
   const totalPenalty = activeConstraints.reduce((sum, c) => sum + c.penalty, 0);
-  const score = Math.max(0, Math.min(100, 100 - totalPenalty));
+  const rawScore = Math.max(0, 100 - totalPenalty);
+  const score = Math.min(99, rawScore);
 
   // Total possible waste if all constraints fixed
   let totalWasteTokens = 0;
@@ -32,7 +34,7 @@ export function calculateScore(data) {
 
   // Tier — directly maps to how constraint-free you are
   let tier, label;
-  if (score >= 90) { tier = 'S'; label = 'Full Throughput'; }
+  if (score >= 90) { tier = 'S'; label = 'Near-Perfect Throughput'; }
   else if (score >= 75) { tier = 'A'; label = 'Near Optimal'; }
   else if (score >= 60) { tier = 'B'; label = 'Solid Setup'; }
   else if (score >= 40) { tier = 'C'; label = 'Constraints Active'; }

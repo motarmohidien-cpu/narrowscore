@@ -152,7 +152,7 @@ export function formatScore(scoreData, spend = null) {
     const totalCost = allConstraints.reduce((s, c) => s + (c.monthlyCostUSD || 0), 0);
     if (totalCost > 0) {
       lines.push(`  ${c.bold}${c.white}FIX ALL ${allConstraints.length} CONSTRAINTS${c.reset}`);
-      lines.push(`  ${c.green}$${totalCost.toFixed(2)}/month${c.reset} saved  ${c.dim}|${c.reset}  Score: ${c.bold}${score} → 100${c.reset}`);
+      lines.push(`  ${c.green}$${totalCost.toFixed(2)}/month${c.reset} saved  ${c.dim}|${c.reset}  Score: ${c.bold}${score} → 99${c.reset}`);
       lines.push('');
     }
   }

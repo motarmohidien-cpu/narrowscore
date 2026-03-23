@@ -159,7 +159,7 @@ const TOOL_WEIGHTS = [
 // --- Tier from score ---
 
 function getTier(score) {
-  if (score >= 90) return { tier: 'S', label: 'Claude Whisperer' };
+  if (score >= 90) return { tier: 'S', label: 'Near-Perfect Throughput' };
   if (score >= 75) return { tier: 'A', label: 'Power User' };
   if (score >= 60) return { tier: 'B', label: 'Solid Operator' };
   if (score >= 40) return { tier: 'C', label: 'Getting There' };
@@ -190,7 +190,7 @@ function generateProfile(usedNames) {
   const username = generateUsername(usedNames);
 
   // Score: bell curve centered at 52, stddev 22
-  const score = clamp(Math.round(gaussian(52, 22)), 2, 100);
+  const score = clamp(Math.round(gaussian(52, 22)), 2, 99);
   const { tier, label } = getTier(score);
 
   // Spend: power law — most users $5-50, some $50-200, few $200+
