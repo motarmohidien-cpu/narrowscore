@@ -43,10 +43,14 @@ export async function run(args) {
       return runCard();
     case 'fix':
       return runFix();
+    case 'login':
+      return runLogin();
     case 'publish':
       return runPublish(args.slice(1));
     case 'share':
       return runShare();
+    case 'whoami':
+      return runWhoami();
     case 'help':
     case '--help':
     case '-h':
@@ -94,10 +98,11 @@ async function runScan() {
   console.log(formatScore(scoreData, data.stats.spend));
   console.log('');
 
-  console.log(`  ${c.dim}${data.stats.totalSessions} sessions analyzed across ${Object.keys(data.stats.sessionsPerProject).length} projects${c.reset}`);
+  const dataLabel = data.stats.spend?.dataSource === 'actual' ? `${c.green}actual token data${c.reset}` : `${c.yellow}estimated${c.reset}`;
+  console.log(`  ${c.dim}${data.stats.totalSessions} sessions analyzed across ${Object.keys(data.stats.sessionsPerProject).length} projects (${dataLabel}${c.dim})${c.reset}`);
   console.log(`  ${c.dim}Run ${c.cyan}narrowscore stats${c.dim} for detailed breakdown${c.reset}`);
+  console.log(`  ${c.dim}Run ${c.cyan}narrowscore card${c.dim} to generate your player card${c.reset}`);
   console.log(`  ${c.dim}Run ${c.cyan}narrowscore fix${c.dim} to auto-fix your #1 narrow point${c.reset}`);
-  console.log(`  ${c.dim}Run ${c.cyan}narrowscore share${c.dim} to generate a shareable score card${c.reset}`);
   console.log('');
 }
 
@@ -133,6 +138,130 @@ async function runStats() {
       console.log(`  ${c.dim}${date} ${time}${c.reset}  ${session.turns} turns  ${c.dim}~${mins}min${c.reset}  ${c.cyan}${session.project}${c.reset}`);
     }
     console.log('');
+  }
+}
+
+async function getConfig() {
+  const configPath = join(homedir(), '.claude', 'narrowscore.json');
+  try {
+    return JSON.parse(await readFile(configPath, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+async function saveConfig(config) {
+  const configPath = join(homedir(), '.claude', 'narrowscore.json');
+  await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+async function runLogin() {
+  console.log(banner());
+
+  const config = await getConfig();
+  const API_URL = config.apiUrl || 'http://localhost:3457';
+
+  console.log(`  ${c.bold}Login with GitHub${c.reset}`);
+  console.log(`  ${c.dim}This connects your NarrowScore to your GitHub account.${c.reset}\n`);
+
+  const spinner = startSpinner('Starting GitHub authentication...');
+
+  try {
+    const res = await fetch(`${API_URL}/auth/device`, { method: 'POST' });
+    const data = await res.json();
+
+    if (!data.user_code) {
+      spinner.fail('Failed to start auth');
+      console.error(`  ${c.red}Server returned: ${JSON.stringify(data)}${c.reset}`);
+      console.error(`  ${c.dim}Make sure GITHUB_CLIENT_ID is set on the server.${c.reset}\n`);
+      return;
+    }
+
+    spinner.stop('Auth started');
+
+    console.log(`\n  ${c.bold}${c.yellow}Go to:${c.reset} ${c.cyan}${data.verification_uri}${c.reset}`);
+    console.log(`  ${c.bold}${c.yellow}Enter code:${c.reset} ${c.bold}${c.green}${data.user_code}${c.reset}\n`);
+
+    // Try to open the URL
+    try {
+      const { execSync } = await import('child_process');
+      execSync(`open "${data.verification_uri}"`, { stdio: 'ignore' });
+    } catch { /* not macOS */ }
+
+    const pollSpinner = startSpinner('Waiting for authorization...');
+    const interval = (data.interval || 5) * 1000;
+    const maxAttempts = 60;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, interval));
+
+      const pollRes = await fetch(`${API_URL}/auth/device/poll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_code: data.device_code }),
+      });
+      const result = await pollRes.json();
+
+      if (result.success) {
+        pollSpinner.stop('Authenticated!');
+        config.token = result.token;
+        config.username = result.username;
+        await saveConfig(config);
+
+        console.log(`\n  ${c.green}${c.bold}Logged in as @${result.username}${c.reset}`);
+        console.log(`  ${c.dim}Token saved to ~/.claude/narrowscore.json${c.reset}\n`);
+        return;
+      }
+
+      if (result.error && result.error !== 'authorization_pending') {
+        pollSpinner.fail('Auth failed');
+        console.error(`  ${c.red}${result.error_description || result.error}${c.reset}\n`);
+        return;
+      }
+    }
+
+    pollSpinner.fail('Timed out');
+    console.error(`  ${c.red}Authentication timed out. Try again.${c.reset}\n`);
+  } catch (err) {
+    spinner.fail('Failed to connect');
+    console.error(`  ${c.red}${err.message}${c.reset}`);
+    console.error(`  ${c.dim}Is the server running? Start with: node server/index.js${c.reset}\n`);
+  }
+}
+
+async function runWhoami() {
+  const config = await getConfig();
+
+  if (!config.token) {
+    console.log(`  ${c.dim}Not logged in. Run ${c.cyan}narrowscore login${c.dim} to connect your GitHub.${c.reset}\n`);
+    return;
+  }
+
+  const API_URL = config.apiUrl || 'http://localhost:3457';
+
+  try {
+    const res = await fetch(`${API_URL}/api/me`, {
+      headers: { 'Authorization': `Bearer ${config.token}` },
+    });
+
+    if (!res.ok) {
+      console.log(`  ${c.yellow}Session expired. Run ${c.cyan}narrowscore login${c.yellow} again.${c.reset}\n`);
+      return;
+    }
+
+    const data = await res.json();
+    console.log(`\n  ${c.bold}@${data.username}${c.reset}`);
+    if (data.profile) {
+      console.log(`  Score: ${c.bold}${data.profile.score}/100${c.reset} [${data.profile.tier}]`);
+      console.log(`  Rank: #${data.profile.rank}`);
+    }
+    if (data.badges?.length > 0) {
+      console.log(`  Badges: ${data.badges.map(b => b.badge_id).join(', ')}`);
+    }
+    console.log(`  Plan: ${c.bold}${data.subscription_status}${c.reset}`);
+    console.log('');
+  } catch (err) {
+    console.error(`  ${c.red}${err.message}${c.reset}\n`);
   }
 }
 
@@ -258,14 +387,9 @@ async function runPublish(args = []) {
   const data = await collectData();
   const scoreData = calculateScore(data);
 
-  // Get or create username config
-  const configPath = join(homedir(), '.claude', 'narrowscore.json');
-  let config = {};
-  try {
-    config = JSON.parse(await readFile(configPath, 'utf-8'));
-  } catch { /* no config yet */ }
+  let config = await getConfig();
 
-  // Check args for --username first
+  // Check args for --username
   for (const arg of args) {
     if (arg.startsWith('--username=')) {
       config.username = arg.split('=')[1].toLowerCase().replace(/\s+/g, '-');
@@ -282,13 +406,13 @@ async function runPublish(args = []) {
   }
 
   if (!config.username) {
-    console.log(`  ${c.yellow}Set a username first:${c.reset}`);
+    console.log(`  ${c.yellow}Login first or set a username:${c.reset}`);
+    console.log(`  ${c.cyan}  narrowscore login${c.reset}`);
     console.log(`  ${c.cyan}  narrowscore publish --username your-name${c.reset}\n`);
     return;
   }
 
-  // Save config
-  await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+  await saveConfig(config);
 
   const spinner = startSpinner('Publishing to leaderboard...');
 
@@ -314,9 +438,12 @@ async function runPublish(args = []) {
   const API_URL = config.apiUrl || 'http://localhost:3457';
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.token) headers['Authorization'] = `Bearer ${config.token}`;
+
     const res = await fetch(`${API_URL}/api/submit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
 
@@ -324,6 +451,13 @@ async function runPublish(args = []) {
     spinner.stop('Published!');
 
     console.log(`\n  ${c.bold}${c.green}${result.message}${c.reset}`);
+
+    if (result.newBadges?.length > 0) {
+      for (const badge of result.newBadges) {
+        console.log(`  ${c.yellow}New badge: ${c.bold}${badge.name}${c.reset} ${c.dim}— ${badge.desc}${c.reset}`);
+      }
+    }
+
     console.log(`  ${c.dim}View leaderboard: ${API_URL}${c.reset}\n`);
   } catch (err) {
     spinner.fail('Failed to publish');
@@ -402,9 +536,12 @@ function showHelp() {
   console.log(`    narrowscore stats        Detailed session statistics`);
   console.log(`    narrowscore card         Generate your player card (PNG)`);
   console.log(`    narrowscore fix          Auto-fix your #1 narrow point`);
-  console.log(`    narrowscore publish       Publish score to leaderboard`);
-  console.log(`    narrowscore share        Generate shareable score card`);
-  console.log(`    narrowscore help         Show this help`);
+  console.log('');
+  console.log(`  ${c.bold}SOCIAL${c.reset}`);
+  console.log(`    narrowscore login        Connect your GitHub account`);
+  console.log(`    narrowscore publish      Publish score to leaderboard`);
+  console.log(`    narrowscore share        Generate shareable text card`);
+  console.log(`    narrowscore whoami       Show your account info`);
   console.log('');
   console.log(`  ${c.bold}PHILOSOPHY${c.reset}`);
   console.log(`    Based on Goldratt's Theory of Constraints.`);
@@ -416,5 +553,5 @@ function showHelp() {
 }
 
 function showVersion() {
-  console.log('narrowscore v0.1.0');
+  console.log('narrowscore v1.0.0');
 }

@@ -1,6 +1,6 @@
 {
   "name": "narrowscore",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Find your narrow. Fix it. Repeat. — The AI efficiency score for Claude Code users.",
   "type": "module",
   "bin": {

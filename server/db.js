@@ -24,8 +24,28 @@ export function getDb() {
 
   // Create schema
   db.exec(`
+    -- Users (real accounts via GitHub OAuth)
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      github_id INTEGER UNIQUE NOT NULL,
+      username TEXT UNIQUE NOT NULL,
+      display_name TEXT,
+      avatar_url TEXT,
+      email TEXT,
+      github_token TEXT,
+      price_locked_cents INTEGER DEFAULT 0,
+      price_locked_at TEXT,
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      subscription_status TEXT DEFAULT 'free',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Profiles (scores — linked to users, or simulated)
     CREATE TABLE IF NOT EXISTS profiles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
       username TEXT UNIQUE NOT NULL,
       score INTEGER NOT NULL DEFAULT 0,
       tier TEXT NOT NULL DEFAULT 'F',
@@ -49,6 +69,80 @@ export function getDb() {
     CREATE INDEX IF NOT EXISTS idx_spend ON profiles(spend_usd DESC);
     CREATE INDEX IF NOT EXISTS idx_tokens ON profiles(tokens_total DESC);
     CREATE INDEX IF NOT EXISTS idx_join_date ON profiles(join_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id);
+
+    -- Follow graph
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id INTEGER NOT NULL REFERENCES users(id),
+      following_id INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (follower_id, following_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
+    CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
+
+    -- Score history (for graphs over time)
+    CREATE TABLE IF NOT EXISTS score_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      score INTEGER NOT NULL,
+      tier TEXT NOT NULL,
+      spend_usd REAL DEFAULT 0,
+      tokens_total INTEGER DEFAULT 0,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_score_history_user ON score_history(user_id, recorded_at);
+
+    -- Activity feed events
+    CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      event_type TEXT NOT NULL,
+      data TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
+
+    -- Reactions on events
+    CREATE TABLE IF NOT EXISTS reactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      event_id INTEGER NOT NULL REFERENCES events(id),
+      emoji TEXT NOT NULL DEFAULT 'fire',
+      created_at TEXT NOT NULL,
+      UNIQUE(user_id, event_id)
+    );
+
+    -- Comments on profiles
+    CREATE TABLE IF NOT EXISTS comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      profile_user_id INTEGER NOT NULL REFERENCES users(id),
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_comments_profile ON comments(profile_user_id, created_at DESC);
+
+    -- Badges/achievements
+    CREATE TABLE IF NOT EXISTS user_badges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      badge_id TEXT NOT NULL,
+      earned_at TEXT NOT NULL,
+      UNIQUE(user_id, badge_id)
+    );
+
+    -- Notifications
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      type TEXT NOT NULL,
+      data TEXT NOT NULL DEFAULT '{}',
+      read INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read, created_at DESC);
   `);
 
   return db;
@@ -169,20 +263,22 @@ export function submitScore(profileData) {
         score = @score, tier = @tier, label = @label, spend_tier = @spendTier,
         spend_usd = @spendUSD, tokens_total = @tokensTotal, days_active = @daysActive,
         projects = @projects, sessions = @sessions, narrows_cleared = @narrowsCleared,
-        narrows_total = @narrowsTotal, top_tools = @topTools, updated_at = @updatedAt
+        narrows_total = @narrowsTotal, top_tools = @topTools, updated_at = @updatedAt,
+        user_id = COALESCE(@userId, user_id)
       WHERE username = @username
     `).run({
       ...profileData,
       topTools: JSON.stringify(profileData.topTools),
       updatedAt: new Date().toISOString(),
+      userId: profileData.userId || null,
     });
   } else {
     // Insert
     database.prepare(`
-      INSERT INTO profiles (username, score, tier, label, spend_tier, spend_usd, tokens_total,
+      INSERT INTO profiles (user_id, username, score, tier, label, spend_tier, spend_usd, tokens_total,
         days_active, projects, sessions, narrows_cleared, narrows_total, top_tools,
         avatar_color, join_date, updated_at, simulated)
-      VALUES (@username, @score, @tier, @label, @spendTier, @spendUSD, @tokensTotal,
+      VALUES (@userId, @username, @score, @tier, @label, @spendTier, @spendUSD, @tokensTotal,
         @daysActive, @projects, @sessions, @narrowsCleared, @narrowsTotal, @topTools,
         @avatarColor, @joinDate, @updatedAt, 0)
     `).run({
@@ -191,6 +287,7 @@ export function submitScore(profileData) {
       avatarColor: profileData.avatarColor || '#4ECDC4',
       joinDate: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString(),
+      userId: profileData.userId || null,
     });
   }
 
@@ -234,4 +331,46 @@ export function getGlobalStats() {
     tierDistribution: Object.fromEntries(tierCounts.map(t => [t.tier, t.count])),
     newUsersThisWeek: recentJoins.count,
   };
+}
+
+// ============================
+// USER MANAGEMENT
+// ============================
+
+/**
+ * Find or create a user from GitHub OAuth data.
+ */
+export function findOrCreateUser(db, ghUser, accessToken) {
+  const existing = db.prepare('SELECT * FROM users WHERE github_id = ?').get(ghUser.id);
+
+  if (existing) {
+    // Update token and profile info
+    db.prepare(`
+      UPDATE users SET github_token = ?, display_name = ?, avatar_url = ?, updated_at = ?
+      WHERE id = ?
+    `).run(accessToken, ghUser.name || ghUser.login, ghUser.avatar_url, new Date().toISOString(), existing.id);
+    return existing;
+  }
+
+  // Create new user
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    INSERT INTO users (github_id, username, display_name, avatar_url, email, github_token, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(ghUser.id, ghUser.login.toLowerCase(), ghUser.name || ghUser.login, ghUser.avatar_url, ghUser.email, accessToken, now, now);
+
+  // Link existing profile if username matches
+  const profile = db.prepare('SELECT id FROM profiles WHERE username = ?').get(ghUser.login.toLowerCase());
+  if (profile) {
+    db.prepare('UPDATE profiles SET user_id = ? WHERE id = ?').run(result.lastInsertRowid, profile.id);
+  }
+
+  return { id: result.lastInsertRowid, username: ghUser.login.toLowerCase(), display_name: ghUser.name || ghUser.login };
+}
+
+/**
+ * Get user by username.
+ */
+export function getUserByUsername(db, username) {
+  return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
