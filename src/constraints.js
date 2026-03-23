@@ -8,10 +8,12 @@
  * 4. ELEVATE (invest to break it)
  * 5. REPEAT — find the next constraint
  *
+ * Score = 100 - sum of active constraint penalties.
+ * No constraints = 100. You're at full throughput.
+ *
  * Each constraint returns monetary estimates:
  * - tokensWasted: estimated tokens wasted per month
  * - monthlyCostUSD: dollar value of that waste
- * - scoreGain: points gained by fixing this constraint
  */
 
 // Blended token cost: mix of Sonnet ($3/$15 in/out) and Opus ($15/$75 in/out)
@@ -19,9 +21,6 @@
 // Blended rate: ~$12 per 1M tokens (weighted input+output)
 const COST_PER_1K_TOKENS = 0.012;
 
-/**
- * Estimate monthly token waste and cost from a constraint.
- */
 function estimateCost(tokensWasted) {
   const monthlyCostUSD = (tokensWasted / 1000) * COST_PER_1K_TOKENS;
   return {
@@ -30,186 +29,164 @@ function estimateCost(tokensWasted) {
   };
 }
 
+/**
+ * 8 constraints, 100 total points.
+ * Each constraint has a fixed max penalty (weight).
+ * Severity (0-100) scales how bad it is — but even partial = points lost.
+ */
 const CONSTRAINTS = [
+  // ─── CONTEXT (52 pts) ───────────────────────────────
   {
     id: 'no_claude_md',
     name: 'No CLAUDE.md',
-    priority: 1,
     category: 'context',
     weight: 25,
+    step: 'IDENTIFY',
     detect({ claudeMd, stats }) {
       const hasGlobal = !!claudeMd.globalClaudeMd;
       const activeProjects = Object.entries(stats.sessionsPerProject)
         .filter(([, count]) => count >= 3)
         .map(([path]) => path);
-
-      const projectsWithMd = new Set(
-        claudeMd.projectClaudeMds.map(p => p.project)
-      );
-
+      const projectsWithMd = new Set(claudeMd.projectClaudeMds.map(p => p.project));
       const missing = activeProjects.filter(p => !projectsWithMd.has(p));
 
-      // Estimate: without CLAUDE.md, ~3,000 tokens wasted per session re-explaining context
-      // Monthly sessions estimate from recent data
-      const weeklySessions = stats.recentSessions.length || 10;
-      const monthlySessions = weeklySessions * 4;
+      const monthlySessions = (stats.recentSessions.length || 10) * 4;
 
       if (!hasGlobal && missing.length > 0) {
-        const wastedPerSession = 4000;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
+        const waste = monthlySessions * 4000;
         return {
           found: true,
           severity: 95,
+          penalty: 24,
           details: `No global CLAUDE.md and ${missing.length} active project(s) without context files.`,
-          waste: `You're re-explaining your stack every session.`,
-          impact: `~${wastedPerSession.toLocaleString()} tokens wasted per session, ${monthlySessions} sessions/month.`,
-          scoreGain: 24,
-          ...cost,
+          narrow: 'Claude re-learns your entire stack every session. This is your #1 bottleneck.',
+          fix: 'Run `narrowscore fix` to auto-generate CLAUDE.md from your session history.',
+          fixCommand: 'generate-claude-md',
+          ...estimateCost(waste),
         };
       }
 
       if (!hasGlobal) {
-        const wastedPerSession = 3000;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
+        const waste = monthlySessions * 3000;
         return {
           found: true,
           severity: 80,
+          penalty: 20,
           details: 'No global ~/.claude/CLAUDE.md found.',
-          waste: 'Claude starts every session with zero knowledge about you.',
-          impact: `~${wastedPerSession.toLocaleString()} tokens/session x ${monthlySessions} sessions/month.`,
-          scoreGain: 20,
-          ...cost,
+          narrow: 'Claude starts every session with zero knowledge about you.',
+          fix: 'Run `narrowscore fix` to auto-generate CLAUDE.md.',
+          fixCommand: 'generate-claude-md',
+          ...estimateCost(waste),
         };
       }
 
       if (missing.length > 0) {
-        const wastedPerSession = 1500 * missing.length;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
+        const waste = monthlySessions * 1500 * missing.length;
         return {
           found: true,
           severity: 60,
-          details: `${missing.length} active project(s) have no CLAUDE.md: ${missing.join(', ')}`,
-          waste: 'Project-specific context not persisted between sessions.',
-          impact: `~${wastedPerSession.toLocaleString()} tokens/session across missing projects.`,
-          scoreGain: 15,
-          ...cost,
+          penalty: 15,
+          details: `${missing.length} active project(s) have no CLAUDE.md: ${missing.slice(0, 3).join(', ')}`,
+          narrow: 'Project-specific context not persisted between sessions.',
+          fix: 'Run `narrowscore fix` to generate project-level CLAUDE.md files.',
+          fixCommand: 'generate-claude-md',
+          ...estimateCost(waste),
         };
       }
 
       return { found: false };
     },
-    fix: 'Run `narrowscore fix` to auto-generate CLAUDE.md from your session history.',
-    fixCommand: 'generate-claude-md',
   },
 
   {
     id: 'thin_claude_md',
     name: 'Thin CLAUDE.md',
-    priority: 2,
     category: 'context',
     weight: 15,
+    step: 'EXPLOIT',
     detect({ claudeMd, stats }) {
       const global = claudeMd.globalClaudeMd;
-      if (!global) return { found: false };
+      if (!global) return { found: false }; // Caught by no_claude_md
 
-      const weeklySessions = stats.recentSessions.length || 10;
-      const monthlySessions = weeklySessions * 4;
+      const monthlySessions = (stats.recentSessions.length || 10) * 4;
 
       if (global.lines < 5) {
-        const wastedPerSession = 2000;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
         return {
           found: true,
           severity: 70,
-          details: `Global CLAUDE.md exists but is only ${global.lines} lines.`,
-          waste: 'A thin context file is almost as bad as no context file.',
-          impact: `~${wastedPerSession.toLocaleString()} tokens/session from missing context.`,
-          scoreGain: 10,
-          ...cost,
+          penalty: 11,
+          details: `Global CLAUDE.md exists but only ${global.lines} lines.`,
+          narrow: 'A thin context file is almost as bad as none. Claude still guesses your preferences.',
+          fix: 'Run `narrowscore fix` to enrich your CLAUDE.md from session patterns.',
+          fixCommand: 'evolve-claude-md',
+          ...estimateCost(monthlySessions * 2000),
         };
       }
 
       if (global.lines < 15) {
-        const wastedPerSession = 800;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
         return {
           found: true,
           severity: 40,
+          penalty: 6,
           details: `Global CLAUDE.md is ${global.lines} lines. Could encode more of your workflow.`,
-          waste: 'Opportunities to reduce repeated explanations.',
-          impact: `~${wastedPerSession.toLocaleString()} tokens/session from gaps in context.`,
-          scoreGain: 6,
-          ...cost,
+          narrow: 'Missing stack details, preferences, or project context that Claude keeps asking about.',
+          fix: 'Run `narrowscore fix` to suggest additions based on your session history.',
+          fixCommand: 'evolve-claude-md',
+          ...estimateCost(monthlySessions * 800),
         };
       }
 
       return { found: false };
     },
-    fix: 'Run `narrowscore evolve` to analyze your sessions and suggest additions to CLAUDE.md.',
-    fixCommand: 'evolve-claude-md',
   },
 
   {
     id: 'no_memory',
     name: 'No memory system',
-    priority: 3,
     category: 'context',
     weight: 12,
+    step: 'EXPLOIT',
     detect({ claudeMd, stats }) {
-      const hasMemory = claudeMd.memoryDir &&
-        claudeMd.memoryDir.files &&
-        claudeMd.memoryDir.files.length > 0;
-
-      const weeklySessions = stats.recentSessions.length || 10;
-      const monthlySessions = weeklySessions * 4;
+      const hasMemory = claudeMd.memoryDir?.files?.length > 0;
+      const monthlySessions = (stats.recentSessions.length || 10) * 4;
 
       if (!hasMemory) {
-        const wastedPerSession = 1500;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
         return {
           found: true,
           severity: 55,
+          penalty: 7,
           details: 'No memory files found. Claude forgets everything between sessions.',
-          waste: 'Decisions, preferences, and context lost after every conversation.',
-          impact: `~${wastedPerSession.toLocaleString()} tokens/session re-teaching Claude.`,
-          scoreGain: 7,
-          ...cost,
+          narrow: 'Decisions, preferences, and context lost after every conversation.',
+          fix: 'Tell Claude to "remember" key facts. E.g. "Remember our API uses REST with JWT auth."',
+          fixCommand: 'suggest-memories',
+          ...estimateCost(monthlySessions * 1500),
         };
       }
 
       if (claudeMd.memoryDir.files.length < 3) {
-        const wastedPerSession = 500;
-        const totalWaste = monthlySessions * wastedPerSession;
-        const cost = estimateCost(totalWaste);
         return {
           found: true,
           severity: 30,
-          details: `Only ${claudeMd.memoryDir.files.length} memory file(s). Memory system is underutilized.`,
-          waste: 'Claude is only remembering a fraction of what it could.',
-          impact: `~${wastedPerSession.toLocaleString()} tokens/session from gaps in memory.`,
-          scoreGain: 4,
-          ...cost,
+          penalty: 4,
+          details: `Only ${claudeMd.memoryDir.files.length} memory file(s). Memory system underutilized.`,
+          narrow: 'Claude only remembers a fraction of what it could about your projects.',
+          fix: 'Tell Claude to remember your top 5-10 project facts, team conventions, and preferences.',
+          fixCommand: 'suggest-memories',
+          ...estimateCost(monthlySessions * 500),
         };
       }
 
       return { found: false };
     },
-    fix: 'Ask Claude to "remember" key facts about your projects, preferences, and workflows.',
-    fixCommand: 'suggest-memories',
   },
 
+  // ─── EFFICIENCY (15 pts) ────────────────────────────
   {
     id: 'repeated_context',
     name: 'Repeated context in messages',
-    priority: 4,
     category: 'efficiency',
     weight: 15,
+    step: 'IDENTIFY',
     detect({ stats, sessions }) {
       const allUserMessages = sessions.flatMap(s =>
         s.userMessages.map(m => m.text.toLowerCase().trim())
@@ -233,34 +210,33 @@ const CONSTRAINTS = [
 
       if (repeatedPhrases.length > 0) {
         const totalRepeats = repeatedPhrases.reduce((sum, [, c]) => sum + c, 0);
-        // Each repeated phrase ~ 25 tokens, plus Claude re-processing context around it
         const tokensPerRepeat = 200;
         const totalWaste = totalRepeats * tokensPerRepeat;
-        const cost = estimateCost(totalWaste);
+        const penalty = Math.min(15, Math.round(3 + totalRepeats * 0.8));
         return {
           found: true,
           severity: Math.min(70, 30 + totalRepeats * 5),
-          details: `Found ${repeatedPhrases.length} phrase(s) repeated ${totalRepeats}+ times across sessions.`,
-          waste: `You're typing the same context repeatedly. This should be in CLAUDE.md or memory.`,
-          impact: `~${totalWaste.toLocaleString()} tokens wasted on repeated context.`,
-          scoreGain: 11,
-          ...cost,
+          penalty,
+          details: `${repeatedPhrases.length} phrase(s) repeated ${totalRepeats}+ times across sessions.`,
+          narrow: 'You type the same context repeatedly. This should be in CLAUDE.md or memory.',
+          fix: 'Run `narrowscore fix` to extract repeated context into your CLAUDE.md.',
+          fixCommand: 'evolve-claude-md',
+          ...estimateCost(totalWaste),
           repeatedPhrases: repeatedPhrases.map(([phrase, count]) => ({ phrase, count })),
         };
       }
 
       return { found: false };
     },
-    fix: 'Run `narrowscore fix` to extract repeated context into your CLAUDE.md.',
-    fixCommand: 'evolve-claude-md',
   },
 
+  // ─── WORKFLOW (15 pts) ──────────────────────────────
   {
     id: 'no_subagents',
     name: 'No subagent usage',
-    priority: 5,
     category: 'workflow',
     weight: 10,
+    step: 'ELEVATE',
     detect({ stats }) {
       if (stats.totalSessions < 5) return { found: false };
 
@@ -268,20 +244,18 @@ const CONSTRAINTS = [
       const agentRatio = agentUsage / Math.max(1, stats.totalSessions);
 
       if (agentRatio < 0.1) {
-        // Serial execution wastes time, not tokens directly — but time = money
-        // Estimate: 20% of sessions could benefit from parallelism, saving ~5 min each
         const sessionsPerMonth = (stats.recentSessions.length || 10) * 4;
         const parallelizableSessions = Math.round(sessionsPerMonth * 0.2);
         const minutesSaved = parallelizableSessions * 5;
-        // Time value: developer time at ~$50/hr = $0.83/min
         const timeSavingsUSD = Math.round(minutesSaved * 0.83 * 100) / 100;
         return {
           found: true,
           severity: 45,
+          penalty: 5,
           details: `Agent/subagent tool used only ${agentUsage} times across ${stats.totalSessions} sessions.`,
-          waste: 'Tasks running serially that could be parallelized.',
-          impact: `~${minutesSaved} minutes/month of dev time recoverable with subagents.`,
-          scoreGain: 5,
+          narrow: 'Tasks running serially that could run in parallel. You wait while Claude works one thing at a time.',
+          fix: 'Ask Claude to "use subagents" or "research this in parallel" for complex tasks.',
+          fixCommand: null,
           tokensWasted: 0,
           monthlyCostUSD: timeSavingsUSD,
           isTimeSaving: true,
@@ -290,135 +264,120 @@ const CONSTRAINTS = [
 
       return { found: false };
     },
-    fix: 'Ask Claude to "use subagents" or "research this in parallel" for complex tasks.',
-    fixCommand: null,
-  },
-
-  {
-    id: 'no_hooks_skills',
-    name: 'No hooks or custom skills',
-    priority: 6,
-    category: 'automation',
-    weight: 10,
-    detect({ features, stats }) {
-      const hasHooks = features.hooks;
-      const hasSkills = features.skills.length > 0;
-      const hasCommands = features.commands.length > 0;
-
-      const sessionsPerMonth = (stats.recentSessions.length || 10) * 4;
-
-      if (!hasHooks && !hasSkills && !hasCommands) {
-        // Estimate: 500 tokens/session typing repetitive workflow instructions
-        const wastedPerSession = 500;
-        const totalWaste = sessionsPerMonth * wastedPerSession;
-        const cost = estimateCost(totalWaste);
-        return {
-          found: true,
-          severity: 40,
-          details: 'No hooks, custom skills, or slash commands configured.',
-          waste: 'Repetitive workflows typed manually every time.',
-          impact: `~${wastedPerSession} tokens/session on workflow instructions.`,
-          scoreGain: 4,
-          ...cost,
-        };
-      }
-
-      if (!hasHooks) {
-        const wastedPerSession = 200;
-        const totalWaste = sessionsPerMonth * wastedPerSession;
-        const cost = estimateCost(totalWaste);
-        return {
-          found: true,
-          severity: 25,
-          details: 'No hooks configured. Missing event-driven automation.',
-          waste: 'Post-commit formatting, auto-testing could be automated.',
-          impact: `~${wastedPerSession} tokens/session on manual triggers.`,
-          scoreGain: 2,
-          ...cost,
-        };
-      }
-
-      return { found: false };
-    },
-    fix: 'Configure hooks in settings.json for common workflows (auto-format, auto-test, etc.).',
-    fixCommand: null,
-  },
-
-  {
-    id: 'no_mcp',
-    name: 'No MCP servers',
-    priority: 7,
-    category: 'integration',
-    weight: 8,
-    detect({ features, stats }) {
-      if (features.mcpServers.length === 0) {
-        const sessionsPerMonth = (stats.recentSessions.length || 10) * 4;
-        // Estimate: 300 tokens/session copy-pasting from external tools
-        const wastedPerSession = 300;
-        const totalWaste = sessionsPerMonth * wastedPerSession;
-        const cost = estimateCost(totalWaste);
-        return {
-          found: true,
-          severity: 30,
-          details: 'No MCP servers configured. Claude can\'t reach external tools.',
-          waste: 'Manual copy-pasting from databases, APIs, or external services.',
-          impact: `~${wastedPerSession} tokens/session on manual data transfer.`,
-          scoreGain: 2,
-          ...cost,
-        };
-      }
-
-      return { found: false };
-    },
-    fix: 'Add MCP servers in ~/.claude/mcp_config.json for tools you use daily.',
-    fixCommand: null,
   },
 
   {
     id: 'short_sessions',
     name: 'Abandoned sessions',
-    priority: 8,
     category: 'workflow',
     weight: 5,
+    step: 'IDENTIFY',
     detect({ stats, sessions }) {
       if (sessions.length < 5) return { found: false };
 
       const abandoned = sessions.filter(s =>
         s.turnCount <= 1 && s.userMessages.length <= 1
       );
-
       const abandonRate = abandoned.length / sessions.length;
 
       if (abandonRate > 0.25) {
-        // Each abandoned session wastes ~2,000 tokens on system prompt + initial context load
-        const abandonedPerMonth = Math.round(abandoned.length * (4 / Math.max(1, Math.ceil(sessions.length / (stats.recentSessions.length || 10)))));
-        const wastedPerAbandon = 2000;
-        const totalWaste = abandonedPerMonth * wastedPerAbandon;
-        const cost = estimateCost(totalWaste);
+        const abandonedPerMonth = Math.round(abandoned.length * 4);
+        const totalWaste = abandonedPerMonth * 2000;
         return {
           found: true,
           severity: 35,
+          penalty: 2,
           details: `${Math.round(abandonRate * 100)}% of sessions abandoned after 1 turn (${abandoned.length}/${sessions.length}).`,
-          waste: 'Each abandoned session wastes ~2,000 tokens on initialization.',
-          impact: `~${abandonedPerMonth} abandoned sessions/month = ${totalWaste.toLocaleString()} wasted tokens.`,
-          scoreGain: 2,
-          ...cost,
+          narrow: 'Each abandoned session wastes ~2,000 tokens on initialization. Something is causing restarts.',
+          fix: 'Write clearer initial prompts. A good CLAUDE.md reduces false starts.',
+          fixCommand: null,
+          ...estimateCost(totalWaste),
         };
       }
 
       return { found: false };
     },
-    fix: 'Write clearer initial prompts. A good CLAUDE.md reduces the need to restart.',
-    fixCommand: null,
+  },
+
+  // ─── AUTOMATION (10 pts) ────────────────────────────
+  {
+    id: 'no_hooks_skills',
+    name: 'No hooks or custom skills',
+    category: 'automation',
+    weight: 10,
+    step: 'ELEVATE',
+    detect({ features, stats }) {
+      const hasHooks = features.hooks;
+      const hasSkills = features.skills.length > 0;
+      const hasCommands = features.commands.length > 0;
+      const monthlySessions = (stats.recentSessions.length || 10) * 4;
+
+      if (!hasHooks && !hasSkills && !hasCommands) {
+        const waste = monthlySessions * 500;
+        return {
+          found: true,
+          severity: 40,
+          penalty: 4,
+          details: 'No hooks, custom skills, or slash commands configured.',
+          narrow: 'Repetitive workflows typed manually every session. No automation layer.',
+          fix: 'Configure hooks in settings.json for auto-format, auto-test, deploy triggers.',
+          fixCommand: null,
+          ...estimateCost(waste),
+        };
+      }
+
+      if (!hasHooks) {
+        const waste = monthlySessions * 200;
+        return {
+          found: true,
+          severity: 25,
+          penalty: 2,
+          details: 'No hooks configured. Missing event-driven automation.',
+          narrow: 'Post-commit formatting, auto-testing, CI triggers — all manual.',
+          fix: 'Add hooks in settings.json for common workflows.',
+          fixCommand: null,
+          ...estimateCost(waste),
+        };
+      }
+
+      return { found: false };
+    },
+  },
+
+  // ─── INTEGRATION (8 pts) ────────────────────────────
+  {
+    id: 'no_mcp',
+    name: 'No MCP servers',
+    category: 'integration',
+    weight: 8,
+    step: 'ELEVATE',
+    detect({ features, stats }) {
+      if (features.mcpServers.length === 0) {
+        const monthlySessions = (stats.recentSessions.length || 10) * 4;
+        const waste = monthlySessions * 300;
+        return {
+          found: true,
+          severity: 30,
+          penalty: 2,
+          details: 'No MCP servers configured. Claude can\'t reach external tools.',
+          narrow: 'Manual copy-pasting from databases, APIs, or external services.',
+          fix: 'Add MCP servers in ~/.claude/mcp_config.json for tools you use daily.',
+          fixCommand: null,
+          ...estimateCost(waste),
+        };
+      }
+
+      return { found: false };
+    },
   },
 ];
 
 /**
- * Run all constraints and return sorted by severity.
+ * Run all constraints and return sorted by penalty (highest first).
+ * This IS the narrow — the top result is the #1 bottleneck.
  */
 export function detectConstraints(data) {
   const results = [];
-
   const allSessions = data.projectsData.flatMap(p => p.sessions);
 
   for (const constraint of CONSTRAINTS) {
@@ -433,47 +392,37 @@ export function detectConstraints(data) {
       results.push({
         id: constraint.id,
         name: constraint.name,
-        priority: constraint.priority,
         category: constraint.category,
         weight: constraint.weight,
-        fix: constraint.fix,
-        fixCommand: constraint.fixCommand,
+        step: constraint.step,
         ...result,
       });
     }
   }
 
-  results.sort((a, b) => b.severity - a.severity);
-
+  // Sort by penalty descending — the biggest bottleneck first
+  results.sort((a, b) => b.penalty - a.penalty);
   return results;
 }
 
 /**
- * Get total savings across all constraints.
+ * Get total savings if ALL constraints were fixed.
  */
 export function getTotalSavings(data) {
   const constraints = detectConstraints(data);
   let totalTokens = 0;
   let totalCostUSD = 0;
-  let totalScoreGain = 0;
 
   for (const c of constraints) {
     totalTokens += c.tokensWasted || 0;
     totalCostUSD += c.monthlyCostUSD || 0;
-    totalScoreGain += c.scoreGain || 0;
   }
 
   return {
     totalTokens,
     totalCostUSD: Math.round(totalCostUSD * 100) / 100,
-    totalScoreGain: Math.min(100, totalScoreGain),
     constraints,
   };
-}
-
-export function getTopConstraint(data) {
-  const constraints = detectConstraints(data);
-  return constraints[0] || null;
 }
 
 export { CONSTRAINTS };

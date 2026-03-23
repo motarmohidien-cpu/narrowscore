@@ -1,111 +1,76 @@
 /**
- * Score Calculator — weighted score 0-100 across all constraint categories.
- * Higher = fewer bottlenecks = better Claude Code usage.
+ * Score Calculator — purely constraint-driven.
  *
- * Categories and max weights:
- * - context (CLAUDE.md + memory): 52 points
- * - efficiency (repeated context): 15 points
- * - workflow (subagents, sessions): 15 points
- * - automation (hooks, skills): 10 points
- * - integration (MCP): 8 points
- * Total: 100
+ * Score = 100 - sum of active constraint penalties.
+ * No constraints = 100. Full throughput.
+ * Every constraint drags the score down by its penalty.
+ *
+ * 8 constraints, 100 total possible penalty points:
+ * - Context (52): no_claude_md(25), thin_claude_md(15), no_memory(12)
+ * - Efficiency (15): repeated_context(15)
+ * - Workflow (15): no_subagents(10), short_sessions(5)
+ * - Automation (10): no_hooks_skills(10)
+ * - Integration (8): no_mcp(8)
  */
 
-import { CONSTRAINTS, detectConstraints } from './constraints.js';
+import { detectConstraints, CONSTRAINTS } from './constraints.js';
 
-/**
- * Calculate the Narrow Score.
- * Starts at 100, subtracts based on detected constraints weighted by severity.
- */
 export function calculateScore(data) {
-  const constraints = detectConstraints(data);
+  const activeConstraints = detectConstraints(data);
 
-  // Build a map of constraint results by id
-  const constraintMap = new Map(constraints.map(c => [c.id, c]));
+  // Score = 100 minus the sum of all active constraint penalties
+  const totalPenalty = activeConstraints.reduce((sum, c) => sum + c.penalty, 0);
+  const score = Math.max(0, Math.min(100, 100 - totalPenalty));
 
-  let totalPossible = 0;
-  let totalLost = 0;
-  const breakdown = {};
+  // Total possible waste if all constraints fixed
+  let totalWasteTokens = 0;
+  let totalWasteUSD = 0;
+  for (const c of activeConstraints) {
+    totalWasteTokens += c.tokensWasted || 0;
+    totalWasteUSD += c.monthlyCostUSD || 0;
+  }
 
+  // Tier — directly maps to how constraint-free you are
+  let tier, label;
+  if (score >= 90) { tier = 'S'; label = 'Full Throughput'; }
+  else if (score >= 75) { tier = 'A'; label = 'Near Optimal'; }
+  else if (score >= 60) { tier = 'B'; label = 'Solid Setup'; }
+  else if (score >= 40) { tier = 'C'; label = 'Constraints Active'; }
+  else if (score >= 20) { tier = 'D'; label = 'Major Bottlenecks'; }
+  else { tier = 'F'; label = 'Severely Constrained'; }
+
+  // Category breakdown
+  const categories = {};
   for (const def of CONSTRAINTS) {
-    totalPossible += def.weight;
+    if (!categories[def.category]) {
+      categories[def.category] = { maxPoints: 0, penalty: 0, constraints: [] };
+    }
+    categories[def.category].maxPoints += def.weight;
+  }
 
-    const detected = constraintMap.get(def.id);
-    if (detected) {
-      // Points lost = weight * (severity / 100)
-      const lost = Math.round(def.weight * (detected.severity / 100));
-      totalLost += lost;
-
-      if (!breakdown[def.category]) breakdown[def.category] = { possible: 0, lost: 0 };
-      breakdown[def.category].possible += def.weight;
-      breakdown[def.category].lost += lost;
-    } else {
-      // No constraint found — full points earned
-      if (!breakdown[def.category]) breakdown[def.category] = { possible: 0, lost: 0 };
-      breakdown[def.category].possible += def.weight;
+  for (const c of activeConstraints) {
+    if (categories[c.category]) {
+      categories[c.category].penalty += c.penalty;
+      categories[c.category].constraints.push(c.id);
     }
   }
 
-  const score = Math.max(0, Math.min(100, totalPossible - totalLost));
-
-  // Calculate category scores
-  const categories = {};
-  for (const [cat, data] of Object.entries(breakdown)) {
-    categories[cat] = {
-      score: Math.round(((data.possible - data.lost) / data.possible) * 100),
-      pointsEarned: data.possible - data.lost,
-      pointsPossible: data.possible,
-    };
+  for (const [, cat] of Object.entries(categories)) {
+    cat.score = Math.round(((cat.maxPoints - cat.penalty) / cat.maxPoints) * 100);
   }
-
-  // Determine tier
-  let tier, label;
-  if (score >= 90) { tier = 'S'; label = 'Claude Whisperer'; }
-  else if (score >= 75) { tier = 'A'; label = 'Power User'; }
-  else if (score >= 60) { tier = 'B'; label = 'Solid Operator'; }
-  else if (score >= 40) { tier = 'C'; label = 'Getting There'; }
-  else if (score >= 20) { tier = 'D'; label = 'Room to Grow'; }
-  else { tier = 'F'; label = 'Fresh Start'; }
 
   return {
     score,
     tier,
     label,
     categories,
-    constraintsFound: constraints.length,
+    constraintsFound: activeConstraints.length,
     totalConstraints: CONSTRAINTS.length,
-    topConstraint: constraints[0] || null,
-    allConstraints: constraints,
+    constraintsCleared: CONSTRAINTS.length - activeConstraints.length,
+    totalPenalty,
+    totalWasteTokens,
+    totalWasteUSD: Math.round(totalWasteUSD * 100) / 100,
+    topConstraint: activeConstraints[0] || null,
+    allConstraints: activeConstraints,
   };
-}
-
-/**
- * Generate a shareable score card (text-based).
- */
-export function generateScoreCard(scoreData, username = 'anon') {
-  const { score, tier, label, constraintsFound, totalConstraints } = scoreData;
-  const bar = generateBar(score);
-  const cleared = totalConstraints - constraintsFound;
-
-  return [
-    '',
-    `  @${username}'s Claude Code Score`,
-    '',
-    `  ${bar}  ${score}/100  [${tier}]`,
-    `  ${label}`,
-    '',
-    `  Bottlenecks cleared: ${cleared}/${totalConstraints}`,
-    '',
-    `  Find your narrow: npx narrowscore`,
-    '',
-  ].join('\n');
-}
-
-/**
- * Generate a visual progress bar.
- */
-function generateBar(score, width = 20) {
-  const filled = Math.round((score / 100) * width);
-  const empty = width - filled;
-  return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
 }

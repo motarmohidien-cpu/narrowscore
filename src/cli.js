@@ -26,6 +26,7 @@ import {
   colors as c,
 } from './display.js';
 import { generateCardPNG } from './card.js';
+import { recordScan, getLastScan, compareScan, getCumulativeStats } from './history.js';
 import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -53,6 +54,8 @@ export async function run(args) {
       return runWhoami();
     case 'subscribe':
       return runSubscribe();
+    case 'monitor':
+      return runMonitor();
     case 'help':
     case '--help':
     case '-h':
@@ -96,15 +99,45 @@ async function runScan() {
   const data = await collectData();
   const scoreData = calculateScore(data);
 
+  // Get last scan for comparison BEFORE recording the new one
+  const prevScan = await getLastScan();
+
+  // Record this scan
+  const currentEntry = await recordScan(scoreData, data.stats.spend);
+
   console.log('');
   console.log(formatScore(scoreData, data.stats.spend));
-  console.log('');
 
+  // Show before/after if we have a previous scan
+  if (prevScan) {
+    const diff = compareScan(currentEntry, prevScan);
+    if (diff) {
+      console.log('');
+      if (diff.improved) {
+        console.log(`  ${c.green}${c.bold}PROGRESS${c.reset}  Score: ${prevScan.score} → ${currentEntry.score} ${c.green}(+${diff.scoreDelta})${c.reset}`);
+      } else if (diff.scoreDelta < 0) {
+        console.log(`  ${c.yellow}${c.bold}REGRESSION${c.reset}  Score: ${prevScan.score} → ${currentEntry.score} ${c.red}(${diff.scoreDelta})${c.reset}`);
+      } else {
+        console.log(`  ${c.dim}Score unchanged since last scan (${currentEntry.score}/100)${c.reset}`);
+      }
+
+      if (diff.cleared.length > 0) {
+        console.log(`  ${c.green}Constraints cleared:${c.reset} ${diff.cleared.join(', ')}`);
+      }
+      if (diff.newConstraints.length > 0) {
+        console.log(`  ${c.red}New constraints:${c.reset} ${diff.newConstraints.join(', ')}`);
+      }
+      if (diff.monthlySavings > 0) {
+        console.log(`  ${c.green}Saving $${diff.monthlySavings}/month${c.reset} since last scan`);
+      }
+    }
+  }
+
+  console.log('');
   const dataLabel = data.stats.spend?.dataSource === 'actual' ? `${c.green}actual token data${c.reset}` : `${c.yellow}estimated${c.reset}`;
   console.log(`  ${c.dim}${data.stats.totalSessions} sessions analyzed across ${Object.keys(data.stats.sessionsPerProject).length} projects (${dataLabel}${c.dim})${c.reset}`);
-  console.log(`  ${c.dim}Run ${c.cyan}narrowscore stats${c.dim} for detailed breakdown${c.reset}`);
-  console.log(`  ${c.dim}Run ${c.cyan}narrowscore card${c.dim} to generate your player card${c.reset}`);
   console.log(`  ${c.dim}Run ${c.cyan}narrowscore fix${c.dim} to auto-fix your #1 narrow point${c.reset}`);
+  console.log(`  ${c.dim}Run ${c.cyan}narrowscore monitor${c.dim} to see your progress over time${c.reset}`);
   console.log('');
 }
 
@@ -304,6 +337,40 @@ async function runCard() {
 
 async function runFix() {
   console.log(banner());
+
+  // Check subscription
+  const config = await getConfig();
+  const isPro = await checkProAccess(config);
+
+  if (!isPro) {
+    // Show the narrow for free — but gate the fix
+    const data = await collectData();
+    const scoreData = calculateScore(data);
+
+    if (scoreData.topConstraint) {
+      const tc = scoreData.topConstraint;
+      console.log(`\n  ${c.bold}${c.red}#1 NARROW:${c.reset} ${c.bold}${tc.name}${c.reset}  ${c.dim}(-${tc.penalty} points)${c.reset}`);
+      console.log(`  ${c.dim}${tc.details}${c.reset}`);
+      console.log(`  ${c.yellow}${tc.narrow}${c.reset}`);
+      if (tc.monthlyCostUSD > 0) {
+        console.log(`  ${c.green}Fixing this saves $${tc.monthlyCostUSD.toFixed(2)}/month${c.reset}`);
+      }
+    }
+
+    console.log('');
+    console.log(`  ${c.bold}${c.yellow}Auto-fix requires NarrowScore Pro.${c.reset}`);
+    console.log(`  ${c.dim}Run ${c.cyan}narrowscore subscribe${c.dim} to unlock.${c.reset}`);
+
+    // Show pricing urgency
+    try {
+      const API_URL = config.apiUrl || 'http://localhost:3457';
+      const res = await fetch(`${API_URL}/api/pricing`);
+      const pricing = await res.json();
+      console.log(`  ${c.yellow}${pricing.urgencyMessage}${c.reset}`);
+    } catch { /* offline */ }
+    console.log('');
+    return;
+  }
 
   const data = await collectData();
   const scoreData = calculateScore(data);
@@ -533,6 +600,93 @@ async function runSubscribe() {
   }
 }
 
+async function runMonitor() {
+  console.log(banner());
+
+  const stats = await getCumulativeStats();
+
+  if (!stats || stats.totalScans < 2) {
+    console.log(`  ${c.dim}Not enough data yet. Run ${c.cyan}narrowscore${c.dim} at least twice to see progress.${c.reset}\n`);
+    return;
+  }
+
+  // Check subscription for full access
+  const config = await getConfig();
+  const isPro = await checkProAccess(config);
+
+  console.log(`\n  ${c.bold}${c.white}NARROWSCORE MONITOR${c.reset}`);
+  console.log(`  ${c.dim}${stats.totalScans} scans over ${stats.daysSinceFirst} days${c.reset}\n`);
+
+  // Score trend
+  const first = stats.firstScan;
+  const latest = stats.latestScan;
+  const scoreDelta = latest.score - first.score;
+  const scoreArrow = scoreDelta > 0 ? `${c.green}+${scoreDelta}` : scoreDelta < 0 ? `${c.red}${scoreDelta}` : `${c.dim}±0`;
+  console.log(`  ${c.bold}Score${c.reset}         ${first.score} → ${c.bold}${latest.score}${c.reset}  ${scoreArrow}${c.reset}`);
+  console.log(`  ${c.bold}Constraints${c.reset}   ${first.constraintsFound} → ${latest.constraintsFound}  ${c.dim}(${stats.totalConstraintsCleared} cleared)${c.reset}`);
+
+  if (stats.totalWasteSaved > 0) {
+    console.log(`  ${c.bold}${c.green}Saved${c.reset}         ${c.green}$${stats.totalWasteSaved}/month${c.reset} in waste eliminated`);
+  }
+
+  if (stats.totalWasteSaved > 0) {
+    const annual = Math.round(stats.totalWasteSaved * 12);
+    console.log(`  ${c.bold}Projected${c.reset}     ${c.green}$${annual}/year${c.reset} if sustained`);
+  }
+
+  console.log('');
+
+  if (!isPro) {
+    // Show limited history
+    console.log(`  ${c.dim}Last 3 scans:${c.reset}`);
+    for (const scan of stats.history.slice(-3)) {
+      const d = new Date(scan.timestamp).toLocaleDateString();
+      console.log(`  ${c.dim}${d}${c.reset}  Score: ${c.bold}${scan.score}${c.reset}  Constraints: ${scan.constraintsFound}  Waste: $${scan.totalWasteUSD}/mo`);
+    }
+    console.log('');
+    console.log(`  ${c.yellow}${c.bold}Full history & detailed trends: narrowscore subscribe${c.reset}`);
+    console.log('');
+    return;
+  }
+
+  // Pro: full history
+  console.log(`  ${c.bold}Scan History${c.reset}`);
+  for (const scan of stats.history.slice(-10)) {
+    const d = new Date(scan.timestamp).toLocaleDateString();
+    const t = new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const bar = '█'.repeat(Math.round(scan.score / 5)) + '░'.repeat(20 - Math.round(scan.score / 5));
+    console.log(`  ${c.dim}${d} ${t}${c.reset}  ${scoreColorFn(scan.score)}${bar}${c.reset} ${c.bold}${scan.score}${c.reset}  ${c.dim}${scan.constraintsFound} narrows${c.reset}`);
+  }
+  if (stats.history.length > 10) {
+    console.log(`  ${c.dim}... ${stats.history.length - 10} earlier scans${c.reset}`);
+  }
+  console.log('');
+}
+
+function scoreColorFn(score) {
+  if (score >= 75) return c.green;
+  if (score >= 50) return c.yellow;
+  return c.red;
+}
+
+/**
+ * Check if user has pro access (active subscription).
+ */
+async function checkProAccess(config) {
+  if (!config?.token) return false;
+  const API_URL = config.apiUrl || 'http://localhost:3457';
+  try {
+    const res = await fetch(`${API_URL}/api/subscription`, {
+      headers: { 'Authorization': `Bearer ${config.token}` },
+    });
+    if (!res.ok) return false;
+    const info = await res.json();
+    return info.status === 'active';
+  } catch {
+    return false;
+  }
+}
+
 function getSpendTierName(usd) {
   if (usd >= 500) return 'WHALE';
   if (usd >= 200) return 'POWER SPENDER';
@@ -598,16 +752,19 @@ function generatePlainShareCard(scoreData, username, spend = null) {
 
 function showHelp() {
   console.log(banner());
-  console.log(`  ${c.bold}USAGE${c.reset}`);
-  console.log(`    narrowscore              Scan & score your Claude Code setup`);
+  console.log(`  ${c.bold}FREE${c.reset}`);
+  console.log(`    narrowscore              Scan & score — see your #1 narrow + $ waste`);
   console.log(`    narrowscore stats        Detailed session statistics`);
   console.log(`    narrowscore card         Generate your player card (PNG)`);
+  console.log('');
+  console.log(`  ${c.bold}PRO${c.reset}`);
   console.log(`    narrowscore fix          Auto-fix your #1 narrow point`);
+  console.log(`    narrowscore monitor      Score trends & savings over time`);
+  console.log(`    narrowscore subscribe    Subscribe to NarrowScore Pro`);
   console.log('');
   console.log(`  ${c.bold}SOCIAL${c.reset}`);
   console.log(`    narrowscore login        Connect your GitHub account`);
   console.log(`    narrowscore publish      Publish score to leaderboard`);
-  console.log(`    narrowscore subscribe    Subscribe to NarrowScore Pro`);
   console.log(`    narrowscore share        Generate shareable text card`);
   console.log(`    narrowscore whoami       Show your account info`);
   console.log('');

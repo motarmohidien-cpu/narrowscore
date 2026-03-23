@@ -119,11 +119,12 @@ export function formatScore(scoreData, spend = null) {
   }
 
   // Category breakdown
-  lines.push(`  ${c.bold}${c.white}BREAKDOWN${c.reset}`);
+  lines.push(`  ${c.bold}${c.white}BREAKDOWN${c.reset}  ${c.dim}${scoreData.constraintsCleared}/${scoreData.totalConstraints} constraints cleared${c.reset}`);
   for (const [cat, data] of Object.entries(categories)) {
     const catBar = progressBar(data.score, 100, 12);
     const catLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
-    lines.push(`  ${catBar} ${catLabel.padEnd(14)} ${c.dim}${data.pointsEarned}/${data.pointsPossible}${c.reset}`);
+    const earned = data.maxPoints - data.penalty;
+    lines.push(`  ${catBar} ${catLabel.padEnd(14)} ${c.dim}${earned}/${data.maxPoints}${c.reset}`);
   }
   lines.push('');
 
@@ -132,10 +133,7 @@ export function formatScore(scoreData, spend = null) {
     lines.push(`  ${c.bold}${c.red}#1 NARROW${c.reset}  ${c.bold}${topConstraint.name}${c.reset}`);
     lines.push(`  ${c.dim}${topConstraint.details}${c.reset}`);
     lines.push('');
-    lines.push(`  ${c.yellow}${topConstraint.waste}${c.reset}`);
-    if (topConstraint.impact) {
-      lines.push(`  ${c.dim}${topConstraint.impact}${c.reset}`);
-    }
+    lines.push(`  ${c.yellow}${topConstraint.narrow}${c.reset}`);
 
     // Money line — the killer feature
     if (topConstraint.monthlyCostUSD > 0) {
@@ -143,10 +141,7 @@ export function formatScore(scoreData, spend = null) {
       const savingLabel = topConstraint.isTimeSaving ? 'dev time' : 'tokens';
       lines.push(`  ${c.bold}${c.green}💰 Fix this → save ${costStr}/month${c.reset} ${c.dim}(${savingLabel})${c.reset}`);
     }
-    if (topConstraint.scoreGain) {
-      const projected = Math.min(100, score + topConstraint.scoreGain);
-      lines.push(`  ${c.bold}${c.cyan}📈 Score: ${score} → ${projected}${c.reset} ${c.dim}(+${topConstraint.scoreGain} points)${c.reset}`);
-    }
+    lines.push(`  ${c.bold}${c.cyan}📈 Fix this → Score: ${score} → ${Math.min(100, score + topConstraint.penalty)}${c.reset} ${c.dim}(+${topConstraint.penalty} points)${c.reset}`);
     lines.push('');
     lines.push(`  ${c.green}→ ${topConstraint.fix}${c.reset}`);
     lines.push('');
@@ -155,11 +150,9 @@ export function formatScore(scoreData, spend = null) {
   // Total savings across ALL constraints
   if (allConstraints.length > 0) {
     const totalCost = allConstraints.reduce((s, c) => s + (c.monthlyCostUSD || 0), 0);
-    const totalGain = allConstraints.reduce((s, c) => s + (c.scoreGain || 0), 0);
-    const projectedScore = Math.min(100, score + totalGain);
     if (totalCost > 0) {
-      lines.push(`  ${c.bold}${c.white}TOTAL SAVINGS IF ALL FIXED${c.reset}`);
-      lines.push(`  ${c.green}$${totalCost.toFixed(2)}/month${c.reset} saved  ${c.dim}|${c.reset}  Score: ${c.bold}${score} → ${projectedScore}${c.reset}`);
+      lines.push(`  ${c.bold}${c.white}FIX ALL ${allConstraints.length} CONSTRAINTS${c.reset}`);
+      lines.push(`  ${c.green}$${totalCost.toFixed(2)}/month${c.reset} saved  ${c.dim}|${c.reset}  Score: ${c.bold}${score} → 100${c.reset}`);
       lines.push('');
     }
   }
@@ -168,10 +161,9 @@ export function formatScore(scoreData, spend = null) {
   if (allConstraints.length > 1) {
     lines.push(`  ${c.bold}${c.white}OTHER NARROWS${c.reset} ${c.dim}(fix #1 first — Goldratt)${c.reset}`);
     for (const cn of allConstraints.slice(1, 4)) {
-      const sev = cn.severity >= 60 ? c.red : cn.severity >= 30 ? c.yellow : c.dim;
+      const sev = cn.penalty >= 10 ? c.red : cn.penalty >= 4 ? c.yellow : c.dim;
       const costTag = cn.monthlyCostUSD > 0 ? ` ${c.green}$${cn.monthlyCostUSD.toFixed(2)}/mo${c.reset}` : '';
-      const gainTag = cn.scoreGain ? ` ${c.dim}+${cn.scoreGain}pts${c.reset}` : '';
-      lines.push(`  ${sev}●${c.reset} ${cn.name}${costTag}${gainTag}`);
+      lines.push(`  ${sev}●${c.reset} ${cn.name}  ${c.dim}-${cn.penalty}pts${c.reset}${costTag}`);
     }
     if (allConstraints.length > 4) {
       lines.push(`  ${c.dim}  +${allConstraints.length - 4} more${c.reset}`);
